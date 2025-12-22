@@ -1,0 +1,9 @@
+﻿__pycache__/
+*.py[cod]
+*$py.class
+.env
+*.mp3
+static/audio/*.mp3
+venv/
+env/
+.venv/

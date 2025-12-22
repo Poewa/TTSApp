@@ -1,0 +1,36 @@
+﻿# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+venv/
+env/
+.venv/
+
+# Environment files
+.env
+.env.local
+
+# Generated audio
+static/audio/*.mp3
+
+# Git
+.git
+.gitignore
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Documentation
+README.md
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Data
+data/

@@ -1,0 +1,22 @@
+﻿version: "3.8"
+
+services:
+  tts-app:
+    build: .
+    container_name: tts-poc
+    ports:
+      - "5000:5000"
+    environment:
+      - AZURE_OPENAI_API_KEY=${AZURE_OPENAI_API_KEY}
+      - AZURE_OPENAI_ENDPOINT=${AZURE_OPENAI_ENDPOINT}
+      - FLASK_ENV=production
+    # Uncomment below to persist audio files between restarts
+    # volumes:
+    #   - ./data/audio:/app/static/audio
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5000/"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
