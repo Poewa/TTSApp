@@ -1,5 +1,8 @@
 ﻿FROM python:3.13-slim
 
+# Disable Python output buffering for Docker logs
+ENV PYTHONUNBUFFERED=1
+
 # Set working directory
 WORKDIR /app
 
@@ -30,5 +33,5 @@ USER appuser
 # Expose port
 EXPOSE 5000
 
-# Use Gunicorn for production
-CMD ["gunicorn", "--bind", "0.0.0.0:5000", "--workers", "2", "--timeout", "120", "wsgi:app"]
+# Use Gunicorn for production with unbuffered logging
+CMD ["gunicorn", "--bind", "0.0.0.0:5000", "--workers", "2", "--timeout", "120", "--access-logfile", "-", "--error-logfile", "-", "--log-level", "info", "wsgi:app"]
