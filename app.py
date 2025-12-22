@@ -88,18 +88,14 @@ def get_voices():
         service = request.args.get('service', 'openai')
 
         if service == 'speech':
-            # Azure Speech Service voices - Danish and English only
+            # Azure Speech Service voices - Danish and UK English only
             voices = [
-                # English voices
-                {'name': 'en-US-JennyNeural', 'displayName': 'Jenny (US Female)', 'language': 'en-US'},
-                {'name': 'en-US-GuyNeural', 'displayName': 'Guy (US Male)', 'language': 'en-US'},
-                {'name': 'en-GB-SoniaNeural', 'displayName': 'Sonia (UK Female)', 'language': 'en-GB'},
-                {'name': 'en-GB-RyanNeural', 'displayName': 'Ryan (UK Male)', 'language': 'en-GB'},
-                {'name': 'en-AU-NatashaNeural', 'displayName': 'Natasha (AU Female)', 'language': 'en-AU'},
-                {'name': 'en-AU-WilliamNeural', 'displayName': 'William (AU Male)', 'language': 'en-AU'},
-                # Danish voices
+                # Danish voices (default)
                 {'name': 'da-DK-ChristelNeural', 'displayName': 'Christel (DK Female)', 'language': 'da-DK'},
                 {'name': 'da-DK-JeppeNeural', 'displayName': 'Jeppe (DK Male)', 'language': 'da-DK'},
+                # UK English voices
+                {'name': 'en-GB-SoniaNeural', 'displayName': 'Sonia (UK Female)', 'language': 'en-GB'},
+                {'name': 'en-GB-RyanNeural', 'displayName': 'Ryan (UK Male)', 'language': 'en-GB'},
             ]
         else:
             # Azure OpenAI TTS voices
@@ -142,7 +138,7 @@ def generate_speech():
 
             # Construct the REST API endpoint
             speech_url = f"https://{AZURE_SPEECH_REGION}.tts.speech.microsoft.com/cognitiveservices/v1"
-            
+
             # Prepare headers
             headers = {
                 'Ocp-Apim-Subscription-Key': AZURE_SPEECH_KEY,
@@ -150,18 +146,18 @@ def generate_speech():
                 'X-Microsoft-OutputFormat': 'audio-16khz-32kbitrate-mono-mp3',
                 'User-Agent': 'TTSApp'
             }
-            
+
             # Prepare SSML body
             ssml = f"""<speak version='1.0' xml:lang='en-US'>
                 <voice xml:lang='en-US' name='{voice}'>
                     {text}
                 </voice>
             </speak>"""
-            
+
             try:
                 # Make request to Azure Speech Service
                 response = requests.post(speech_url, headers=headers, data=ssml.encode('utf-8'), timeout=30)
-                
+
                 if response.status_code == 200:
                     # Save the audio file
                     with open(filepath, 'wb') as audio_file:
