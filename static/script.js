@@ -1,5 +1,6 @@
 ﻿document.addEventListener('DOMContentLoaded', function () {
     const textInput = document.getElementById('text-input');
+    const serviceSelect = document.getElementById('service-select');
     const voiceSelect = document.getElementById('voice-select');
     const generateBtn = document.getElementById('generate-btn');
     const loading = document.getElementById('loading');
@@ -19,6 +20,7 @@
             subtitle: 'Drevet af Azure OpenAI',
             inputLabel: 'Indtast din tekst:',
             inputPlaceholder: 'Skriv eller indsæt din tekst her...',
+            serviceLabel: 'Vælg tjeneste:',
             voiceLabel: 'Vælg stemme:',
             generateBtn: 'Generer tale',
             loading: 'Genererer lyd...',
@@ -32,6 +34,7 @@
             subtitle: 'Powered by Azure OpenAI',
             inputLabel: 'Enter your text:',
             inputPlaceholder: 'Type or paste your text here...',
+            serviceLabel: 'Select Service:',
             voiceLabel: 'Select Voice:',
             generateBtn: 'Generate Speech',
             loading: 'Generating audio...',
@@ -75,6 +78,34 @@
     // Initialize with Danish
     setLanguage('da');
 
+    // Load voices when service changes
+    async function loadVoices(service) {
+        try {
+            const response = await fetch(`/get-voices?service=${service}`);
+            const data = await response.json();
+
+            if (response.ok && data.voices) {
+                voiceSelect.innerHTML = '';
+                data.voices.forEach(voice => {
+                    const option = document.createElement('option');
+                    option.value = voice.name;
+                    option.textContent = voice.displayName;
+                    voiceSelect.appendChild(option);
+                });
+            }
+        } catch (error) {
+            console.error('Error loading voices:', error);
+        }
+    }
+
+    // Service selector change handler
+    serviceSelect.addEventListener('change', function () {
+        loadVoices(serviceSelect.value);
+    });
+
+    // Load initial voices for Azure Speech Service
+    loadVoices('speech');
+
     generateBtn.addEventListener('click', async function () {
         const text = textInput.value.trim();
 
@@ -99,17 +130,15 @@
                 },
                 body: JSON.stringify({
                     text: text,
-                    voice: voiceSelect.value
+                    voice: voiceSelect.value,
+                    service: serviceSelect.value
                 })
             });
 
             const data = await response.json();
 
             if (!response.ok) {
-                // Check if it's the "not configured" error
-                if (response.status === 503 && data.error.includes('not configured')) {
-                    throw new Error(translations[currentLang].errorNoConfig);
-                }
+                // Use the actual error message from the server
                 throw new Error(data.error || 'Failed to generate speech');
             }
 

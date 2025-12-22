@@ -24,6 +24,14 @@
 
             <div class="controls">
                 <div class="voice-selector">
+                    <label for="service-select" data-i18n="serviceLabel">Vælg tjeneste:</label>
+                    <select id="service-select">
+                        <option value="openai">Azure OpenAI TTS</option>
+                        <option value="speech" selected>Azure Speech Service</option>
+                    </select>
+                </div>
+
+                <div class="voice-selector">
                     <label for="voice-select" data-i18n="voiceLabel">Vælg stemme:</label>
                     <select id="voice-select">
                         <option value="alloy">Alloy</option>
@@ -56,7 +64,7 @@
         <div id="error-message" class="error-message" style="display: none;"></div>
     </div>
 
-    <script src="{{ url_for('static', filename='script.js') }}"></script>
+    <script src="{{ url_for('static', filename='script.js') }}?v=3"></script>
 </body>
 
 </html>

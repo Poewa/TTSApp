@@ -109,7 +109,8 @@ label {
     flex: 1;
 }
 
-#voice-select {
+#voice-select,
+#service-select {
     width: 100%;
     padding: 12px;
     border: 2px solid #e0e0e0;
@@ -120,7 +121,8 @@ label {
     transition: border-color 0.3s;
 }
 
-#voice-select:focus {
+#voice-select:focus,
+#service-select:focus {
     outline: none;
     border-color: #667eea;
 }
