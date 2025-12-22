@@ -2,6 +2,8 @@
     const textInput = document.getElementById('text-input');
     const serviceSelect = document.getElementById('service-select');
     const voiceSelect = document.getElementById('voice-select');
+    const speedSlider = document.getElementById('speed-slider');
+    const speedValue = document.getElementById('speed-value');
     const generateBtn = document.getElementById('generate-btn');
     const loading = document.getElementById('loading');
     const resultSection = document.getElementById('result-section');
@@ -22,6 +24,7 @@
             inputPlaceholder: 'Skriv eller indsæt din tekst her...',
             serviceLabel: 'Vælg tjeneste:',
             voiceLabel: 'Vælg stemme:',
+            speedLabel: 'Hastighed:',
             generateBtn: 'Generer tale',
             loading: 'Genererer lyd...',
             resultTitle: 'Genereret lyd',
@@ -36,6 +39,7 @@
             inputPlaceholder: 'Type or paste your text here...',
             serviceLabel: 'Select Service:',
             voiceLabel: 'Select Voice:',
+            speedLabel: 'Speed:',
             generateBtn: 'Generate Speech',
             loading: 'Generating audio...',
             resultTitle: 'Generated Audio',
@@ -44,6 +48,11 @@
             errorNoConfig: 'Azure OpenAI is not configured. Please set AZURE_OPENAI_API_KEY and AZURE_OPENAI_ENDPOINT in your .env file to enable text-to-speech functionality.'
         }
     };
+
+    // Speed slider update
+    speedSlider.addEventListener('input', function () {
+        speedValue.textContent = parseFloat(speedSlider.value).toFixed(1) + 'x';
+    });
 
     // Language switcher
     function setLanguage(lang) {
@@ -131,7 +140,8 @@
                 body: JSON.stringify({
                     text: text,
                     voice: voiceSelect.value,
-                    service: serviceSelect.value
+                    service: serviceSelect.value,
+                    speed: parseFloat(speedSlider.value)
                 })
             });
 

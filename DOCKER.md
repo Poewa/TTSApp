@@ -7,7 +7,7 @@
 ```bash
 # Create .env file with your credentials
 cp .env.example .env
-# Edit .env with your actual credentials
+# Edit .env with your actual Azure credentials
 
 # Build and start the container
 docker-compose up -d
@@ -27,12 +27,24 @@ The app will be available at `http://localhost:5000`
 # Build the image
 docker build -t tts-poc .
 
-# Run the container
+# Run with Azure OpenAI TTS
 docker run -d \
   --name tts-poc \
   -p 5000:5000 \
-  -e AZURE_OPENAI_API_KEY="your-key" \
-  -e AZURE_OPENAI_ENDPOINT="your-endpoint" \
+  -e AZURE_OPENAI_API_KEY="your-openai-key" \
+  -e AZURE_OPENAI_ENDPOINT="your-openai-endpoint" \
+  -e AZURE_OPENAI_API_VERSION="2025-03-01-preview" \
+  tts-poc
+
+# Run with both TTS services
+docker run -d \
+  --name tts-poc \
+  -p 5000:5000 \
+  -e AZURE_OPENAI_API_KEY="your-openai-key" \
+  -e AZURE_OPENAI_ENDPOINT="your-openai-endpoint" \
+  -e AZURE_OPENAI_API_VERSION="2025-03-01-preview" \
+  -e AZURE_SPEECH_KEY="your-speech-key" \
+  -e AZURE_SPEECH_REGION="swedencentral" \
   tts-poc
 
 # View logs
@@ -53,12 +65,18 @@ docker rm tts-poc
 ✅ **Request size limits** - 16MB max to prevent DoS
 ✅ **No debug mode** - Debug disabled in production
 ✅ **Minimal image** - Based on python:3.13-slim
+✅ **SSL support** - Includes CA certificates for HTTPS connections
 
 ### Environment Variables
 
-**Required:**
-- `AZURE_OPENAI_API_KEY` - Your Azure OpenAI API key
-- `AZURE_OPENAI_ENDPOINT` - Your Azure OpenAI endpoint
+**For Azure OpenAI TTS:**
+- `AZURE_OPENAI_API_KEY` - Your Azure OpenAI API key (required)
+- `AZURE_OPENAI_ENDPOINT` - Your Azure OpenAI endpoint (required)
+- `AZURE_OPENAI_API_VERSION` - API version (default: 2025-03-01-preview)
+
+**For Azure Speech Service:**
+- `AZURE_SPEECH_KEY` - Your Azure Speech Service API key (required)
+- `AZURE_SPEECH_REGION` - Your Speech Service region, e.g., `swedencentral` (required)
 
 **Optional:**
 - `FLASK_ENV=production` - Disable debug mode (recommended)
@@ -70,20 +88,25 @@ docker rm tts-poc
 ```yaml
 # docker-compose.yml with secrets
 services:
-  tts-app:
+  web:
     build: .
     secrets:
-      - azure_api_key
-      - azure_endpoint
+      - azure_openai_key
+      - azure_openai_endpoint
+      - azure_speech_key
     environment:
-      - AZURE_OPENAI_API_KEY_FILE=/run/secrets/azure_api_key
-      - AZURE_OPENAI_ENDPOINT_FILE=/run/secrets/azure_endpoint
+      - AZURE_OPENAI_API_KEY_FILE=/run/secrets/azure_openai_key
+      - AZURE_OPENAI_ENDPOINT_FILE=/run/secrets/azure_openai_endpoint
+      - AZURE_SPEECH_KEY_FILE=/run/secrets/azure_speech_key
+      - AZURE_SPEECH_REGION=swedencentral
 
 secrets:
-  azure_api_key:
-    file: ./secrets/api_key.txt
-  azure_endpoint:
-    file: ./secrets/endpoint.txt
+  azure_openai_key:
+    file: ./secrets/openai_key.txt
+  azure_openai_endpoint:
+    file: ./secrets/openai_endpoint.txt
+  azure_speech_key:
+    file: ./secrets/speech_key.txt
 ```
 
 ### Additional Security Recommendations
@@ -100,11 +123,14 @@ secrets:
 version: '3.8'
 
 services:
-  tts-app:
+  web:
     build: .
     environment:
       - AZURE_OPENAI_API_KEY=${AZURE_OPENAI_API_KEY}
       - AZURE_OPENAI_ENDPOINT=${AZURE_OPENAI_ENDPOINT}
+      - AZURE_OPENAI_API_VERSION=${AZURE_OPENAI_API_VERSION}
+      - AZURE_SPEECH_KEY=${AZURE_SPEECH_KEY}
+      - AZURE_SPEECH_REGION=${AZURE_SPEECH_REGION}
       - FLASK_ENV=production
     networks:
       - internal
@@ -118,7 +144,7 @@ services:
       - ./nginx.conf:/etc/nginx/nginx.conf:ro
       - ./ssl:/etc/nginx/ssl:ro
     depends_on:
-      - tts-app
+      - web
     networks:
       - internal
 
@@ -130,7 +156,7 @@ networks:
 ## Production Checklist
 
 - [ ] Set `FLASK_ENV=production`
-- [ ] Use strong, unique API keys
+- [ ] Use strong, unique API keys for both services
 - [ ] Store credentials in Docker secrets (not .env)
 - [ ] Deploy behind HTTPS reverse proxy
 - [ ] Set up rate limiting
@@ -139,6 +165,8 @@ networks:
 - [ ] Set resource limits (CPU/memory)
 - [ ] Regular security updates
 - [ ] Backup strategy for audio files
+- [ ] Deploy `tts-1-hd` model as `tts-hd` in Azure OpenAI
+- [ ] Verify Speech Service region matches your resource
 
 ## Resource Limits
 
@@ -146,7 +174,7 @@ Add to `docker-compose.yml`:
 
 ```yaml
 services:
-  tts-app:
+  web:
     # ... other config
     deploy:
       resources:
@@ -158,12 +186,58 @@ services:
           memory: 512M
 ```
 
+## Troubleshooting
+
+### Container won't start
+```bash
+# Check logs
+docker-compose logs web
+
+# Common issues:
+# - Missing environment variables (check .env file)
+# - Port 5000 already in use (change in docker-compose.yml)
+# - Permission issues (ensure Dockerfile runs as non-root user)
+```
+
+### Environment variables not loading
+```bash
+# Verify variables inside container
+docker-compose exec web env | grep AZURE
+
+# Should see:
+# AZURE_OPENAI_API_KEY=...
+# AZURE_OPENAI_ENDPOINT=...
+# AZURE_SPEECH_KEY=...
+# AZURE_SPEECH_REGION=...
+```
+
+### Audio generation fails
+```bash
+# Check if REST API is accessible from container
+docker-compose exec web python -c "import requests; print(requests.get('https://swedencentral.tts.speech.microsoft.com').status_code)"
+
+# Test Azure OpenAI connection
+docker-compose exec web python -c "import os; print(os.getenv('AZURE_OPENAI_ENDPOINT'))"
+```
+
+### High memory usage
+- Increase memory limits in docker-compose.yml
+- Enable audio file cleanup (automatically removes files >1 hour old)
+- Check for memory leaks with: `docker stats tts-poc`
+
 ## Health Checks
 
-The app includes a health check endpoint. Monitor with:
+The app automatically cleans up old audio files. Monitor container health with:
 
 ```bash
-docker inspect --format='{{json .State.Health}}' tts-poc
+# Check container status
+docker ps
+
+# View resource usage
+docker stats tts-poc
+
+# Inspect logs for errors
+docker-compose logs -f web | grep ERROR
 ```
 
 ## Troubleshooting

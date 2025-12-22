@@ -119,8 +119,9 @@ def generate_speech():
         text = data.get('text', '')
         voice = data.get('voice', 'alloy')
         service = data.get('service', 'openai')  # 'openai' or 'speech'
+        speed = data.get('speed', 1.0)  # Speed multiplier (0.5 to 2.0)
 
-        print(f"📝 Request received - Service: {service}, Voice: {voice}, Text length: {len(text)}")
+        print(f"📝 Request received - Service: {service}, Voice: {voice}, Speed: {speed}x, Text length: {len(text)}")
 
         if not text:
             return jsonify({'error': 'No text provided'}), 400
@@ -139,18 +140,25 @@ def generate_speech():
             # Construct the REST API endpoint
             speech_url = f"https://{AZURE_SPEECH_REGION}.tts.speech.microsoft.com/cognitiveservices/v1"
 
-            # Prepare headers
+            # Prepare headers with higher quality audio format
             headers = {
                 'Ocp-Apim-Subscription-Key': AZURE_SPEECH_KEY,
                 'Content-Type': 'application/ssml+xml',
-                'X-Microsoft-OutputFormat': 'audio-16khz-32kbitrate-mono-mp3',
+                'X-Microsoft-OutputFormat': 'audio-24khz-96kbitrate-mono-mp3',  # Higher quality
                 'User-Agent': 'TTSApp'
             }
 
-            # Prepare SSML body
+            # Prepare SSML body with speed control
+            # Convert speed (0.5-2.0) to percentage for SSML rate
+            # Clamp to safe range to avoid artifacts
+            rate_percent = max(-50, min(100, int((speed - 1.0) * 100)))
+            rate_str = f"+{rate_percent}%" if rate_percent > 0 else f"{rate_percent}%"
+
             ssml = f"""<speak version='1.0' xml:lang='en-US'>
                 <voice xml:lang='en-US' name='{voice}'>
-                    {text}
+                    <prosody rate='{rate_str}'>
+                        {text}
+                    </prosody>
                 </voice>
             </speak>"""
 
@@ -178,11 +186,12 @@ def generate_speech():
                     'error': 'Azure OpenAI is not configured. Please set AZURE_OPENAI_API_KEY and AZURE_OPENAI_ENDPOINT in your .env file to enable text-to-speech functionality.'
                 }), 503
 
-            # Call Azure OpenAI TTS API
+            # Call Azure OpenAI TTS API with speed control
             response = client.audio.speech.create(
                 model="tts-hd",  # Your deployment name
                 voice=voice,
-                input=text
+                input=text,
+                speed=speed
             )
 
             # Save the audio file

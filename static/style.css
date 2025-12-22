@@ -127,6 +127,18 @@ label {
     border-color: #667eea;
 }
 
+#speed-slider {
+    width: 100%;
+    margin-top: 5px;
+    cursor: pointer;
+}
+
+#speed-value {
+    font-weight: 600;
+    color: #667eea;
+    margin-left: 5px;
+}
+
 .generate-btn {
     padding: 12px 30px;
     background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);

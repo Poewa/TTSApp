@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Text-to-Speech POC</title>
+    <title>TTS</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
 </head>
 
@@ -15,7 +15,6 @@
             <button id="lang-en" class="lang-btn" data-lang="en">🇬🇧</button>
         </div>
         <h1 data-i18n="title">🎙️ Tekst-til-tale Generator</h1>
-        <p class="subtitle" data-i18n="subtitle">Drevet af Azure OpenAI</p>
 
         <div class="input-section">
             <label for="text-input" data-i18n="inputLabel">Indtast din tekst:</label>
@@ -41,6 +40,14 @@
                         <option value="nova">Nova</option>
                         <option value="shimmer">Shimmer</option>
                     </select>
+                </div>
+
+                <div class="voice-selector">
+                    <label for="speed-slider">
+                        <span data-i18n="speedLabel">Hastighed:</span>
+                        <span id="speed-value">1.0x</span>
+                    </label>
+                    <input type="range" id="speed-slider" min="0.75" max="1.5" step="0.05" value="1.0">
                 </div>
 
                 <button id="generate-btn" class="generate-btn" data-i18n="generateBtn">Generer tale</button>
