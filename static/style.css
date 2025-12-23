@@ -127,6 +127,38 @@ label {
     border-color: #667eea;
 }
 
+/* Ensure the download format select matches the other dropdowns visually */
+#download-format {
+    padding: 12px;
+    border: 2px solid #e0e0e0;
+    border-radius: 10px;
+    font-size: 16px;
+    background: white;
+    cursor: pointer;
+    transition: border-color 0.3s;
+    height: 48px;
+}
+
+#download-format:focus {
+    outline: none;
+    border-color: #667eea;
+}
+
+/* Normalize select appearance across browsers (fix Firefox native arrow differences) */
+#download-format {
+    -webkit-appearance: none;
+    -moz-appearance: none;
+    appearance: none;
+    /* Add a custom arrow that matches native styling */
+    background-image: linear-gradient(45deg, transparent 50%, #333 50%),
+        linear-gradient(135deg, #333 50%, transparent 50%);
+    background-position: calc(100% - 18px) calc(50% - 3px), calc(100% - 13px) calc(50% - 3px);
+    background-size: 6px 6px, 6px 6px;
+    background-repeat: no-repeat;
+    padding-right: 40px;
+    /* room for custom arrow */
+}
+
 #speed-slider {
     width: 100%;
     margin-top: 5px;
@@ -210,7 +242,30 @@ label {
 }
 
 .download-section {
-    text-align: center;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: 10px;
+}
+
+.download-section label {
+    color: #444;
+    font-weight: 600;
+}
+
+#download-format {
+    padding: 12px;
+    border: 2px solid #e0e0e0;
+    border-radius: 10px;
+    font-size: 16px;
+    background: white;
+    cursor: pointer;
+    transition: border-color 0.3s;
+}
+
+#download-format:focus {
+    outline: none;
+    border-color: #667eea;
 }
 
 .download-btn {

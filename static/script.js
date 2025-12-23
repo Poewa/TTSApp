@@ -173,7 +173,10 @@
 
     downloadBtn.addEventListener('click', function () {
         if (currentFilename) {
-            window.location.href = `/download/${currentFilename}`;
+            const formatSelect = document.getElementById('download-format');
+            const fmt = formatSelect ? formatSelect.value : 'mp3';
+            // Add format as query parameter
+            window.location.href = `/download/${currentFilename}?format=${fmt}`;
         }
     });
 

@@ -5,6 +5,8 @@ from pathlib import Path
 import uuid
 import time
 import requests
+import subprocess
+import re
 
 app = Flask(__name__)
 
@@ -61,11 +63,16 @@ def cleanup_old_audio_files():
         current_time = time.time()
         deleted_count = 0
 
-        for audio_file in AUDIO_DIR.glob("*.mp3"):
-            file_age = current_time - audio_file.stat().st_mtime
-            if file_age > MAX_FILE_AGE_SECONDS:
-                audio_file.unlink()
-                deleted_count += 1
+        # Remove both mp3 and wav files older than the configured age
+        for pattern in ("*.mp3", "*.wav"):
+            for audio_file in AUDIO_DIR.glob(pattern):
+                file_age = current_time - audio_file.stat().st_mtime
+                if file_age > MAX_FILE_AGE_SECONDS:
+                    try:
+                        audio_file.unlink()
+                        deleted_count += 1
+                    except Exception:
+                        pass
 
         if deleted_count > 0:
             print(f"🧹 Cleaned up {deleted_count} old audio file(s)")
@@ -213,11 +220,38 @@ def generate_speech():
 @app.route('/download/<filename>')
 def download_file(filename):
     try:
+        # Validate filename (we only expect generated UUID filenames like <uuid>.mp3)
+        if not re.match(r'^[a-f0-9\-]+\.mp3$', filename):
+            return jsonify({'error': 'Invalid filename'}), 400
+
         filepath = AUDIO_DIR / filename
-        if filepath.exists():
-            return send_file(filepath, as_attachment=True)
-        else:
+        if not filepath.exists():
             return jsonify({'error': 'File not found'}), 404
+
+        # Optional format query parameter: ?format=wav or ?format=mp3
+        fmt = request.args.get('format', 'mp3').lower()
+        if fmt == 'mp3':
+            return send_file(filepath, as_attachment=True)
+        elif fmt == 'wav':
+            # Check if WAV already exists (cache)
+            stem = filepath.stem
+            wav_path = AUDIO_DIR / f"{stem}.wav"
+            if not wav_path.exists():
+                # Convert mp3 -> wav using ffmpeg
+                try:
+                    # Use a safe, fixed ffmpeg command. Overwrite if exists (-y).
+                    subprocess.run([
+                        'ffmpeg', '-y', '-i', str(filepath),
+                        '-ar', '24000',  # sample rate 24kHz
+                        '-ac', '1',      # mono
+                        str(wav_path)
+                    ], check=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+                except subprocess.CalledProcessError as e:
+                    return jsonify({'error': 'Failed to convert to WAV'}), 500
+
+            return send_file(wav_path, as_attachment=True)
+        else:
+            return jsonify({'error': 'Unsupported format'}), 400
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
