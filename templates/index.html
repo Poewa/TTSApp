@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>TTS</title>
+    <title>Tekst-til-tale</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
 </head>
 
@@ -37,12 +37,7 @@
                 <div class="voice-selector">
                     <label for="voice-select" data-i18n="voiceLabel">Vælg stemme:</label>
                     <select id="voice-select">
-                        <option value="alloy">Alloy</option>
-                        <option value="echo">Echo</option>
-                        <option value="fable">Fable</option>
-                        <option value="onyx">Onyx</option>
-                        <option value="nova">Nova</option>
-                        <option value="shimmer">Shimmer</option>
+                        <!-- Voices will be loaded dynamically -->
                     </select>
                 </div>
 

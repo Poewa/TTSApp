@@ -95,10 +95,13 @@
 
             if (response.ok && data.voices) {
                 voiceSelect.innerHTML = '';
-                data.voices.forEach(voice => {
+                data.voices.forEach((voice, index) => {
                     const option = document.createElement('option');
                     option.value = voice.name;
                     option.textContent = voice.displayName;
+                    if (index === 0) {
+                        option.selected = true;
+                    }
                     voiceSelect.appendChild(option);
                 });
             }
@@ -112,8 +115,8 @@
         loadVoices(serviceSelect.value);
     });
 
-    // Load initial voices for Azure Speech Service
-    loadVoices('speech');
+    // Load initial voices based on the selected service on page load
+    loadVoices(serviceSelect.value);
 
     generateBtn.addEventListener('click', async function () {
         const text = textInput.value.trim();
