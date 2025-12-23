@@ -15,7 +15,8 @@ A web application for converting text to speech using Azure OpenAI TTS and Azure
 - 🧹 **Auto Cleanup** - Removes audio files older than 1 hour
 - 🎨 **Clean & Responsive UI**
 - 🔒 **Production-Ready** with security features
-- 🐳 **Docker Support** for easy deployment
+- 🐳 **Docker Support** with Nginx reverse proxy for SSL/TLS
+- 🔐 **HTTPS Support** - Nginx proxy with your own certificates
 
 ## Prerequisites
 
@@ -25,14 +26,18 @@ A web application for converting text to speech using Azure OpenAI TTS and Azure
 
 ## Setup Instructions
 
-### 1. Clone or Download
+### Development Setup (Local Testing)
+
+For local development and testing outside of Docker:
+
+#### 1. Clone or Download
 
 Navigate to the project directory:
 ```bash
-cd "TTS POC"
+cd TTSApp-main
 ```
 
-### 2. Create Virtual Environment
+#### 2. Create Virtual Environment
 
 ```bash
 python3 -m venv venv
@@ -41,13 +46,13 @@ source venv/bin/activate  # On Linux/Mac
 venv\Scripts\activate  # On Windows
 ```
 
-### 3. Install Dependencies
+#### 3. Install Dependencies
 
 ```bash
 pip install -r requirements.txt
 ```
 
-### 4. Configure Azure Services
+#### 4. Configure Azure Services
 
 Create a `.env` file in the project root:
 
@@ -75,7 +80,9 @@ AZURE_SPEECH_REGION=swedencentral
 3. Go to "Keys and Endpoint"
 4. Copy Key 1 and the Region
 
-### 5. Run the Application
+#### 5. Run the Application (Development Mode)
+
+For local development and testing:
 
 ```bash
 python app.py
@@ -83,7 +90,9 @@ python app.py
 
 The application will start on `http://localhost:5000`
 
-### 6. Use the Application
+**Note:** This runs Flask's development server, which is suitable for testing but not for production. For production deployment, use Docker (see below).
+
+#### 6. Use the Application
 
 1. Open your browser and go to `http://localhost:5000`
 2. **Choose language:** Click 🇩🇰 for Danish or 🇬🇧 for English in the top-right corner
@@ -115,17 +124,23 @@ The application will start on `http://localhost:5000`
 ## Project Structure
 
 ```
-TTS POC/
+TTSApp-main/
 ├── app.py              # Main Flask application with dual TTS service support
 ├── wsgi.py             # Production WSGI entry point
 ├── requirements.txt    # Python dependencies
 ├── .env                # Your credentials (not in git)
 ├── .gitignore          # Git ignore file
 ├── Dockerfile          # Docker container definition
-├── docker-compose.yml  # Docker Compose configuration
+├── docker-compose.yml  # Docker Compose with Nginx proxy
 ├── .dockerignore       # Docker build exclusions
 ├── README.md           # This file
 ├── DOCKER.md           # Docker deployment guide
+├── certs/              # SSL/TLS certificates directory
+│   ├── README.md       # Certificate setup instructions
+│   ├── server.crt      # Your SSL certificate (not in git)
+│   └── server.key      # Your private key (not in git)
+├── nginx/              # Nginx reverse proxy configuration
+│   └── nginx.conf      # Nginx server configuration
 ├── data/
 │   └── audio/          # Persistent audio storage (Docker volume)
 ├── templates/
@@ -166,31 +181,133 @@ TTS POC/
 - For Azure OpenAI TTS: speed range is 0.75x-1.5x
 - For Azure Speech Service: speed affects SSML prosody rate
 
-## Docker Deployment
+## Production Deployment with Docker
 
-For production deployment with Docker, see [DOCKER.md](DOCKER.md) for complete instructions.
+For production deployment, the application uses Docker with an Nginx reverse proxy for SSL/TLS termination.
+
+### Architecture
+
+```
+Internet/Network
+    ↓
+Nginx (Port 443/80) ← Your SSL/TLS Certificates
+    ↓
+Flask App (Internal Port 5000)
+```
+
+### Prerequisites
+
+- Docker and Docker Compose installed
+- SSL/TLS certificate files (e.g., from your organization's CA or Let's Encrypt)
 
 ### Quick Start with Docker
 
+#### 1. Prepare SSL Certificates
+
+Place your certificate files in the `certs/` directory:
+
 ```bash
-# Build and run
-docker-compose up -d
+cd certs/
+# Copy your certificate files here
+# Rename them to:
+# - server.crt (your certificate or certificate chain)
+# - server.key (your private key)
+
+chmod 600 server.key
+```
+
+**Certificate Formats:**
+- Both files should be in PEM format (Base64 encoded)
+- If you have a certificate chain, concatenate them in `server.crt`:
+  ```bash
+  cat your-cert.crt intermediate.crt root.crt > server.crt
+  ```
+
+For detailed certificate instructions, see `certs/README.md`.
+
+#### 2. Configure Environment
+
+Create a `.env` file in the project root with your Azure credentials (see "Configure Azure Services" section above).
+
+#### 3. Deploy
+
+```bash
+# Build and start all services
+docker compose up -d
 
 # View logs
-docker-compose logs -f
+docker compose logs -f
 
-# Stop
-docker-compose down
+# Check status
+docker ps
+
+# Stop services
+docker compose down
 ```
+
+#### 4. Access the Application
+
+- **HTTPS:** `https://your-domain.com` or `https://your-server-ip`
+- **HTTP:** Automatically redirects to HTTPS
+
+### Docker Services
+
+The deployment includes two containers:
+
+1. **nginx** - Reverse proxy with SSL/TLS
+   - Ports: 80 (HTTP) → 443 (HTTPS)
+   - Handles SSL termination
+   - Forwards requests to Flask app
+   - Automatic HTTP → HTTPS redirect
+
+2. **tts-app** - Flask application
+   - Internal port 5000 (not exposed externally)
+   - Runs with Gunicorn WSGI server
+   - Non-root user for security
 
 ### Security Features
 
 The Docker deployment includes:
-- ✅ Non-root user execution
-- ✅ Production WSGI server (Gunicorn)
-- ✅ Security headers (XSS, clickjacking protection)
-- ✅ Request size limits
-- ✅ HSTS headers for HTTPS
+- ✅ **SSL/TLS encryption** via Nginx reverse proxy
+- ✅ **HTTPS enforcement** with automatic HTTP redirect
+- ✅ **Modern TLS configuration** (TLS 1.2/1.3 only)
+- ✅ **Security headers** (HSTS, XSS protection, clickjacking prevention)
+- ✅ **Non-root user execution** in containers
+- ✅ **Production WSGI server** (Gunicorn)
+- ✅ **Request size limits** (16MB)
+- ✅ **Optimized timeouts** for long TTS operations (120s)
+
+### Updating SSL Certificates
+
+To update certificates:
+
+```bash
+# Replace certificate files in certs/ directory
+cp new-cert.crt certs/server.crt
+cp new-key.key certs/server.key
+chmod 600 certs/server.key
+
+# Restart Nginx to load new certificates
+docker compose restart nginx
+```
+
+### Testing the Setup
+
+```bash
+# Test HTTPS connection
+curl -I https://your-server-ip
+
+# Test HTTP redirect
+curl -I http://your-server-ip
+
+# Check Nginx logs
+docker logs tts-nginx
+
+# Check Flask app logs
+docker logs tts-poc
+```
+
+For more detailed Docker deployment information, see [DOCKER.md](DOCKER.md).
 
 ## Tech Stack
 
@@ -198,6 +315,7 @@ The Docker deployment includes:
 - **TTS Services:** Azure OpenAI TTS + Azure Speech Service (REST API)
 - **Frontend:** Vanilla JavaScript, HTML5, CSS3
 - **Production Server:** Gunicorn with security headers
+- **Reverse Proxy:** Nginx (Alpine) for SSL/TLS termination
 - **Containerization:** Docker & Docker Compose
 - **Audio Format:** MP3 (96kbps/24kHz for Speech Service)
 

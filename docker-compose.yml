@@ -1,11 +1,24 @@
 ﻿version: "3.8"
 
 services:
+  nginx:
+    image: nginx:alpine
+    container_name: tts-nginx
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/conf.d/default.conf:ro
+      - ./certs:/etc/nginx/certs:ro
+    depends_on:
+      - tts-app
+    restart: unless-stopped
+
   tts-app:
     build: .
     container_name: tts-poc
-    ports:
-      - "5000:5000"
+    expose:
+      - "5000"
     environment:
       - AZURE_OPENAI_API_KEY=${AZURE_OPENAI_API_KEY}
       - AZURE_OPENAI_ENDPOINT=${AZURE_OPENAI_ENDPOINT}
