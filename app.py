@@ -7,6 +7,7 @@ import time
 import requests
 import subprocess
 import re
+import html
 
 app = Flask(__name__)
 
@@ -21,6 +22,9 @@ def add_security_headers(response):
     response.headers['X-Frame-Options'] = 'DENY'
     response.headers['X-XSS-Protection'] = '1; mode=block'
     response.headers['Strict-Transport-Security'] = 'max-age=31536000; includeSubDomains'
+    response.headers['Content-Security-Policy'] = "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; media-src 'self' blob:; connect-src 'self'"
+    response.headers['Referrer-Policy'] = 'strict-origin-when-cross-origin'
+    response.headers['Permissions-Policy'] = 'geolocation=(), microphone=(), camera=()'
     return response
 
 # Configure Azure OpenAI (optional for demo)
@@ -130,8 +134,20 @@ def generate_speech():
 
         print(f"📝 Request received - Service: {service}, Voice: {voice}, Speed: {speed}x, Text length: {len(text)}")
 
+        # Input validation
         if not text:
             return jsonify({'error': 'No text provided'}), 400
+
+        if len(text) > 10000:  # Reasonable limit for TTS
+            return jsonify({'error': 'Text too long. Maximum 10,000 characters allowed.'}), 400
+
+        # Validate service selection
+        if service not in ['openai', 'speech']:
+            return jsonify({'error': 'Invalid service selection'}), 400
+
+        # Validate speed range
+        if not (0.25 <= speed <= 4.0):
+            return jsonify({'error': 'Invalid speed value. Must be between 0.25 and 4.0'}), 400
 
         # Generate unique filename
         filename = f"{uuid.uuid4()}.mp3"
@@ -161,10 +177,13 @@ def generate_speech():
             rate_percent = max(-50, min(100, int((speed - 1.0) * 100)))
             rate_str = f"+{rate_percent}%" if rate_percent > 0 else f"{rate_percent}%"
 
+            # Escape text to prevent SSML injection
+            safe_text = html.escape(text)
+
             ssml = f"""<speak version='1.0' xml:lang='en-US'>
                 <voice xml:lang='en-US' name='{voice}'>
                     <prosody rate='{rate_str}'>
-                        {text}
+                        {safe_text}
                     </prosody>
                 </voice>
             </speak>"""
