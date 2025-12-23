@@ -1,6 +1,6 @@
 ﻿# Text-to-Speech Application
 
-A web application for converting text to speech using Azure OpenAI TTS and Azure Speech Service with Danish and English language support.
+A web application for converting text to speech using Azure OpenAI TTS and Azure Speech Service with Danish and English language support. Branded for Gladsaxe Kommune.
 
 ## Features
 
@@ -9,11 +9,11 @@ A web application for converting text to speech using Azure OpenAI TTS and Azure
 - 🌐 **Bilingual UI** - Switch between Danish and English interface
 - 🗣️ **Multiple Voices** - Danish (Christel, Jeppe) and UK English (Sonia, Ryan)
 - ⚡ **Speed Control** - Adjust speech rate from 0.75x to 1.5x
-- 🎵 **High Quality Audio** - 96kbps/24kHz MP3 output
+- 🎵 **High Quality Audio** - MP3/WAV output with automatic cleanup
 - ▶️ **Browser Playback** - Listen directly in your browser
-- 📥 **Download Support** - Save generated audio files
+- 📥 **Download Support** - Save generated audio files in MP3 or WAV format
 - 🧹 **Auto Cleanup** - Removes audio files older than 1 hour
-- 🎨 **Clean & Responsive UI**
+- 🎨 **Clean & Responsive UI** with Gladsaxe Kommune branding
 - 🔒 **Production-Ready** with security features
 - 🐳 **Docker Support** with Nginx reverse proxy for SSL/TLS
 - 🔐 **HTTPS Support** - Nginx proxy with your own certificates
@@ -97,13 +97,17 @@ The application will start on `http://localhost:5000`
 1. Open your browser and go to `http://localhost:5000`
 2. **Choose language:** Click 🇩🇰 for Danish or 🇬🇧 for English in the top-right corner
 3. **Select service:** Choose between Azure OpenAI TTS or Azure Speech Service
-4. **Select voice:** Pick from available voices (Danish voices listed first)
+   - Voices will automatically update based on your service selection
+4. **Select voice:** Pick from available voices (Danish voices listed first for Speech Service)
 5. **Adjust speed:** Use the slider to control speech rate (0.75x - 1.5x)
 6. Enter the text you want to convert to speech
 7. Click "Generer tale" (or "Generate Speech")
-8. Listen to the audio or download it
+8. Listen to the audio in the browser player
+9. **Download:** Choose MP3 or WAV format and click the download button
 
 **Keyboard shortcut:** Press `Ctrl+Enter` in the text area to generate speech quickly
+
+**Note:** The voice selector dynamically loads appropriate voices based on your selected TTS service to prevent errors.
 
 ## Available Voices
 
@@ -129,6 +133,7 @@ TTSApp-main/
 ├── wsgi.py             # Production WSGI entry point
 ├── requirements.txt    # Python dependencies
 ├── .env                # Your credentials (not in git)
+├── .env.example        # Example environment configuration
 ├── .gitignore          # Git ignore file
 ├── Dockerfile          # Docker container definition
 ├── docker-compose.yml  # Docker Compose with Nginx proxy
@@ -144,10 +149,11 @@ TTSApp-main/
 ├── data/
 │   └── audio/          # Persistent audio storage (Docker volume)
 ├── templates/
-│   └── index.html      # Main HTML page with bilingual UI
+│   └── index.html      # Main HTML page with bilingual UI and Gladsaxe branding
 └── static/
-    ├── style.css       # Responsive styles
-    ├── script.js       # Frontend logic with service switching
+    ├── style.css       # Responsive styles with Gladsaxe Kommune blue theme
+    ├── script.js       # Frontend logic with dynamic voice loading
+    ├── gladsaxe-logo.png  # Gladsaxe Kommune logo
     └── audio/          # Generated audio files (auto-cleaned after 1 hour)
 ```
 
@@ -174,7 +180,13 @@ TTSApp-main/
 ### Language switching not working
 - Clear your browser cache and hard refresh (Ctrl+Shift+R)
 - Check browser console for JavaScript errors
-- Verify script.js is loading with cache-busting parameter (?v=3)
+- Verify script.js is loading correctly
+
+### Voice selection issues
+- Voices are loaded dynamically based on the selected service
+- When switching services, the voice list updates automatically
+- If voices don't load, check browser console for API errors
+- Ensure the service you selected has valid credentials configured
 
 ### Speed control not working
 - Ensure you're using a modern browser (Chrome, Firefox, Edge, Safari)
@@ -314,10 +326,11 @@ For more detailed Docker deployment information, see [DOCKER.md](DOCKER.md).
 - **Backend:** Flask (Python 3.13)
 - **TTS Services:** Azure OpenAI TTS + Azure Speech Service (REST API)
 - **Frontend:** Vanilla JavaScript, HTML5, CSS3
+- **Styling:** Custom CSS with Gladsaxe Kommune blue branding (#0051A5)
 - **Production Server:** Gunicorn with security headers
 - **Reverse Proxy:** Nginx (Alpine) for SSL/TLS termination
 - **Containerization:** Docker & Docker Compose
-- **Audio Format:** MP3 (96kbps/24kHz for Speech Service)
+- **Audio Formats:** MP3 and WAV (user selectable for download)
 
 ## Language & Voice Support
 
@@ -332,10 +345,11 @@ The UI can be switched between:
 
 ## Audio Quality
 
-- **Azure Speech Service:** 24kHz, 96kbps MP3
-- **Azure OpenAI TTS:** Adaptive quality based on model
+- **Azure Speech Service:** 24kHz, MP3 or WAV output (user selectable)
+- **Azure OpenAI TTS:** Adaptive quality based on model, MP3 format
 - **Speed Range:** 0.75x to 1.5x (prevents audio distortion)
 - **Auto Cleanup:** Files older than 1 hour are automatically deleted
+- **Download Formats:** Users can choose between MP3 or WAV for downloading
 
 ## Security Features
 
@@ -349,11 +363,24 @@ The application includes:
 
 ## Contributing
 
-This is a proof of concept application. Feel free to extend it with:
+This application is branded for Gladsaxe Kommune. Feel free to fork and customize for your organization with:
 - Additional voice options
 - More TTS services
 - Advanced audio effects
 - Text preprocessing features
+- Custom branding and color schemes
+
+## Branding
+
+The current version includes:
+- **Gladsaxe Kommune logo** displayed in the header
+- **Blue color scheme** (#0051A5) matching Gladsaxe Kommune branding
+- **Customizable UI** - Easy to rebrand by updating logo and CSS colors
+
+To customize for your organization:
+1. Replace `static/gladsaxe-logo.png` with your logo
+2. Update the color scheme in `static/style.css` (search for `#0051A5`)
+3. Update the page title in `templates/index.html`
 
 ## License
 
