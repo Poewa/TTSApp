@@ -38,9 +38,11 @@
                 <button type="submit" class="btn-primary">Login</button>
             </form>
             
+            {% if allow_registration %}
             <div class="auth-link">
                 <p>Don't have an account? <a href="{{ url_for('register') }}">Register here</a></p>
             </div>
+            {% endif %}
         </div>
     </div>
 </body>

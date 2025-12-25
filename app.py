@@ -17,6 +17,7 @@ app = Flask(__name__)
 app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024  # 16MB max request size
 app.config['JSON_SORT_KEYS'] = False
 app.config['SECRET_KEY'] = os.getenv('SECRET_KEY', os.urandom(24).hex())
+app.config['ALLOW_REGISTRATION'] = os.getenv('ALLOW_REGISTRATION', 'true').lower() == 'true'
 
 # Initialize Flask-Login
 login_manager = LoginManager()
@@ -122,11 +123,15 @@ def login():
         else:
             flash('Invalid username or password', 'error')
     
-    return render_template('login.html')
+    return render_template('login.html', allow_registration=app.config['ALLOW_REGISTRATION'])
 
 @app.route('/register', methods=['GET', 'POST'])
 def register():
     print(f"🔍 REGISTER route called - Method: {request.method}")
+    
+    if not app.config['ALLOW_REGISTRATION']:
+        flash('Registration is currently disabled', 'error')
+        return redirect(url_for('login'))
     
     if current_user.is_authenticated:
         return redirect(url_for('index'))
