@@ -29,6 +29,8 @@
             loading: 'Genererer lyd...',
             resultTitle: 'Genereret lyd',
             downloadBtn: '📥 Download lyd',
+            loggedInAs: 'Logget ind som:',
+            logoutBtn: 'Log ud',
             errorNoText: 'Indtast venligst noget tekst for at konvertere til tale.',
             errorNoConfig: 'Azure OpenAI er ikke konfigureret. Indstil venligst AZURE_OPENAI_API_KEY og AZURE_OPENAI_ENDPOINT i din .env fil for at aktivere tekst-til-tale funktionalitet.'
         },
@@ -44,6 +46,8 @@
             loading: 'Generating audio...',
             resultTitle: 'Generated Audio',
             downloadBtn: '📥 Download Audio',
+            loggedInAs: 'Logged in as:',
+            logoutBtn: 'Logout',
             errorNoText: 'Please enter some text to convert to speech.',
             errorNoConfig: 'Azure OpenAI is not configured. Please set AZURE_OPENAI_API_KEY and AZURE_OPENAI_ENDPOINT in your .env file to enable text-to-speech functionality.'
         }
@@ -62,7 +66,16 @@
         // Update all elements with data-i18n attribute
         document.querySelectorAll('[data-i18n]').forEach(element => {
             const key = element.getAttribute('data-i18n');
-            element.textContent = translations[lang][key];
+            if (key === 'loggedInAs') {
+                // Special handling for "logged in as" to preserve username
+                const username = element.querySelector('strong');
+                if (username) {
+                    const usernameText = username.textContent;
+                    element.innerHTML = `${translations[lang][key]} <strong>${usernameText}</strong>`;
+                }
+            } else {
+                element.textContent = translations[lang][key];
+            }
         });
 
         // Update placeholder

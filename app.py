@@ -250,8 +250,6 @@ def login_azure_callback():
 
         # Log user in
         login_user(user)
-        flash(f'Velkommen, {display_name}!', 'success')
-
         next_page = request.args.get('next')
         return redirect(next_page if next_page else url_for('index'))
 
@@ -305,7 +303,6 @@ def register():
 def logout():
     if app.config['REQUIRE_AUTHENTICATION']:
         logout_user()
-        flash('Du er nu logget ud', 'success')
         return redirect(url_for('login'))
     return redirect(url_for('index'))
 

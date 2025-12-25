@@ -15,8 +15,8 @@
     <div class="container">
         {% if require_auth and username %}
         <div class="user-info">
-            <span>Logged in as: <strong>{{ username }}</strong></span>
-            <a href="{{ url_for('logout') }}" class="logout-btn">Logout</a>
+            <span data-i18n="loggedInAs">Logget ind som: <strong>{{ username }}</strong></span>
+            <a href="{{ url_for('logout') }}" class="logout-btn" data-i18n="logoutBtn">Log ud</a>
         </div>
         {% endif %}
         <div class="language-toggle">
