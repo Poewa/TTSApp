@@ -8,8 +8,10 @@ from pathlib import Path
 from werkzeug.security import generate_password_hash, check_password_hash
 from flask_login import UserMixin
 
-# Use a writable location for users file
-USERS_FILE = Path("users.json")
+# Use data directory for persistent storage
+DATA_DIR = Path("data")
+DATA_DIR.mkdir(parents=True, exist_ok=True)
+USERS_FILE = DATA_DIR / "users.json"
 
 class User(UserMixin):
     """User class for Flask-Login"""
@@ -17,7 +19,7 @@ class User(UserMixin):
         self.id = id
         self.username = username
         self.password_hash = password_hash
-    
+
     def check_password(self, password):
         """Verify password against hash"""
         return check_password_hash(self.password_hash, password)
@@ -65,21 +67,21 @@ def get_user_by_username(username):
 def create_user(username, password):
     """Create a new user"""
     users = load_users()
-    
+
     # Check if username already exists
     for user_data in users.values():
         if user_data['username'] == username:
             return None, "Username already exists"
-    
+
     # Generate new user ID
     user_id = str(len(users) + 1)
-    
+
     # Create user
     users[user_id] = {
         'username': username,
         'password_hash': generate_password_hash(password)
     }
-    
+
     save_users(users)
     return User(user_id, username, users[user_id]['password_hash']), None
 

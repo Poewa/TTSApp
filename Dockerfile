@@ -25,7 +25,7 @@ COPY . .
 
 # Create non-root user for security
 RUN useradd -m -u 1000 appuser && \
-    mkdir -p static/audio && \
+    mkdir -p data/audio && \
     chown -R appuser:appuser /app
 
 # Switch to non-root user

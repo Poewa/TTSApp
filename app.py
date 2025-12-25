@@ -9,6 +9,7 @@ import requests
 import subprocess
 import re
 import html
+from functools import wraps
 from auth import get_user, get_user_by_username, create_user
 
 app = Flask(__name__)
@@ -17,17 +18,29 @@ app = Flask(__name__)
 app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024  # 16MB max request size
 app.config['JSON_SORT_KEYS'] = False
 app.config['SECRET_KEY'] = os.getenv('SECRET_KEY', os.urandom(24).hex())
+app.config['REQUIRE_AUTHENTICATION'] = os.getenv('REQUIRE_AUTHENTICATION', 'true').lower() == 'true'
 app.config['ALLOW_REGISTRATION'] = os.getenv('ALLOW_REGISTRATION', 'true').lower() == 'true'
 
-# Initialize Flask-Login
-login_manager = LoginManager()
-login_manager.init_app(app)
-login_manager.login_view = 'login'
-login_manager.login_message = 'Please log in to access this page.'
+# Initialize Flask-Login only if authentication is required
+if app.config['REQUIRE_AUTHENTICATION']:
+    login_manager = LoginManager()
+    login_manager.init_app(app)
+    login_manager.login_view = 'login'
+    login_manager.login_message = 'Please log in to access this page.'
 
-@login_manager.user_loader
-def load_user(user_id):
-    return get_user(user_id)
+    @login_manager.user_loader
+    def load_user(user_id):
+        return get_user(user_id)
+
+# Conditional login requirement decorator
+def conditional_login_required(f):
+    """Require login only if REQUIRE_AUTHENTICATION is enabled"""
+    @wraps(f)
+    def decorated_function(*args, **kwargs):
+        if app.config['REQUIRE_AUTHENTICATION']:
+            return login_required(f)(*args, **kwargs)
+        return f(*args, **kwargs)
+    return decorated_function
 
 # Add security headers
 @app.after_request
@@ -68,9 +81,17 @@ else:
     print("⚠️  Azure Speech Service not configured")
     print("   Set AZURE_SPEECH_KEY and AZURE_SPEECH_REGION to enable Speech Service")
 
-# Create directory for audio files
-AUDIO_DIR = Path("static/audio")
-AUDIO_DIR.mkdir(parents=True, exist_ok=True)
+# Create directory for audio files inside data directory
+DATA_DIR = Path("data")
+AUDIO_DIR = DATA_DIR / "audio"
+# Create directories with exist_ok to handle volume mount permissions
+try:
+    DATA_DIR.mkdir(parents=True, exist_ok=True)
+    AUDIO_DIR.mkdir(parents=True, exist_ok=True)
+except PermissionError:
+    # If we can't create it, it might already exist from volume mount
+    if not AUDIO_DIR.exists():
+        raise
 
 # Audio file cleanup settings
 MAX_FILE_AGE_SECONDS = 3600  # 1 hour
@@ -104,6 +125,10 @@ cleanup_old_audio_files()
 
 @app.route('/login', methods=['GET', 'POST'])
 def login():
+    # If authentication is disabled, redirect to index
+    if not app.config['REQUIRE_AUTHENTICATION']:
+        return redirect(url_for('index'))
+    
     if current_user.is_authenticated:
         return redirect(url_for('index'))
 
@@ -128,6 +153,10 @@ def login():
 @app.route('/register', methods=['GET', 'POST'])
 def register():
     print(f"🔍 REGISTER route - ALLOW_REGISTRATION config: {app.config['ALLOW_REGISTRATION']}")
+    
+    # If authentication is disabled, redirect to index
+    if not app.config['REQUIRE_AUTHENTICATION']:
+        return redirect(url_for('index'))
 
     if not app.config['ALLOW_REGISTRATION']:
         return redirect(url_for('login'))
@@ -163,19 +192,22 @@ def register():
     return render_template('register.html')
 
 @app.route('/logout')
-@login_required
+@conditional_login_required
 def logout():
-    logout_user()
-    flash('Du er nu logget ud', 'success')
-    return redirect(url_for('login'))
+    if app.config['REQUIRE_AUTHENTICATION']:
+        logout_user()
+        flash('Du er nu logget ud', 'success')
+        return redirect(url_for('login'))
+    return redirect(url_for('index'))
 
 @app.route('/')
-@login_required
+@conditional_login_required
 def index():
-    return render_template('index.html', username=current_user.username)
+    username = current_user.username if (app.config['REQUIRE_AUTHENTICATION'] and current_user.is_authenticated) else None
+    return render_template('index.html', username=username, require_auth=app.config['REQUIRE_AUTHENTICATION'])
 
 @app.route('/get-voices', methods=['GET'])
-@login_required
+@conditional_login_required
 def get_voices():
     """Get available voices for the selected service"""
     try:
@@ -207,7 +239,7 @@ def get_voices():
         return jsonify({'error': str(e)}), 500
 
 @app.route('/generate-speech', methods=['POST'])
-@login_required
+@conditional_login_required
 def generate_speech():
     try:
         data = request.json
@@ -313,15 +345,32 @@ def generate_speech():
 
         return jsonify({
             'success': True,
-            'audio_url': f'/static/audio/{filename}',
+            'audio_url': f'/audio/{filename}',
             'filename': filename
         })
 
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
+@app.route('/audio/<filename>')
+@conditional_login_required
+def serve_audio(filename):
+    """Serve audio files from data directory"""
+    try:
+        # Validate filename
+        if not re.match(r'^[a-f0-9\-]+\.mp3$', filename):
+            return jsonify({'error': 'Invalid filename'}), 400
+
+        filepath = AUDIO_DIR / filename
+        if not filepath.exists():
+            return jsonify({'error': 'File not found'}), 404
+
+        return send_file(filepath, mimetype='audio/mpeg')
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
 @app.route('/download/<filename>')
-@login_required
+@conditional_login_required
 def download_file(filename):
     try:
         # Validate filename (we only expect generated UUID filenames like <uuid>.mp3)

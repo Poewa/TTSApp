@@ -14,10 +14,12 @@
             class="kommune-logo">
     </div>
     <div class="container">
+        {% if require_auth and username %}
         <div class="user-info">
             <span>Logged in as: <strong>{{ username }}</strong></span>
             <a href="{{ url_for('logout') }}" class="logout-btn">Logout</a>
         </div>
+        {% endif %}
         <div class="language-toggle">
             <button id="lang-da" class="lang-btn active" data-lang="da">🇩🇰</button>
             <button id="lang-en" class="lang-btn" data-lang="en">🇬🇧</button>

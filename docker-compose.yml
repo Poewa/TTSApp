@@ -27,11 +27,11 @@ services:
       - AZURE_SPEECH_REGION=${AZURE_SPEECH_REGION}
       - FLASK_ENV=production
       - SECRET_KEY=${SECRET_KEY:-}
+      - REQUIRE_AUTHENTICATION=${REQUIRE_AUTHENTICATION:-true}
       - ALLOW_REGISTRATION=${ALLOW_REGISTRATION:-true}
     volumes:
-      # Persist user data and audio files
+      # Persist user data, audio files and temporary data in a shared directory
       - ./data:/app/data
-      - ./users.json:/app/users.json
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:5000/"]
