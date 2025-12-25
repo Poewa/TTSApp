@@ -1,5 +1,6 @@
 ﻿<!DOCTYPE html>
 <html lang="da">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -7,46 +8,56 @@
     <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='login.css') }}">
 </head>
+
 <body>
     <div class="logo-container">
         <img src="{{ url_for('static', filename='gladsaxe-logo.png') }}" alt="Gladsaxe Kommune" class="kommune-logo">
     </div>
-    
+
+    <div class="language-toggle">
+        <button id="lang-da" class="lang-btn active" data-lang="da">🇩🇰</button>
+        <button id="lang-en" class="lang-btn" data-lang="en">🇬🇧</button>
+    </div>
+
     <div class="login-container">
         <div class="login-box">
-            <h1>📝 Register</h1>
-            
+            <h1 data-i18n="registerTitle">📝 Registrer</h1>
+
             {% with messages = get_flashed_messages(with_categories=true) %}
-                {% if messages %}
-                    {% for category, message in messages %}
-                        <div class="alert alert-{{ category }}">{{ message }}</div>
-                    {% endfor %}
-                {% endif %}
+            {% if messages %}
+            {% for category, message in messages %}
+            <div class="alert alert-{{ category }}">{{ message }}</div>
+            {% endfor %}
+            {% endif %}
             {% endwith %}
-            
+
             <form action="{{ url_for('register') }}" method="POST">
                 <div class="form-group">
-                    <label for="username">Username:</label>
+                    <label for="username" data-i18n="usernameLabel">Brugernavn:</label>
                     <input type="text" id="username" name="username" required autofocus>
                 </div>
-                
+
                 <div class="form-group">
-                    <label for="password">Password:</label>
+                    <label for="password" data-i18n="passwordLabel">Adgangskode:</label>
                     <input type="password" id="password" name="password" required minlength="6">
                 </div>
-                
+
                 <div class="form-group">
-                    <label for="confirm_password">Confirm Password:</label>
+                    <label for="confirm_password" data-i18n="confirmPasswordLabel">Bekræft adgangskode:</label>
                     <input type="password" id="confirm_password" name="confirm_password" required minlength="6">
                 </div>
-                
-                <button type="submit" class="btn-primary">Register</button>
+
+                <button type="submit" class="btn-primary" data-i18n="registerButton">Registrer</button>
             </form>
-            
+
             <div class="auth-link">
-                <p>Already have an account? <a href="{{ url_for('login') }}">Login here</a></p>
+                <p><span data-i18n="loginPrompt">Har du allerede en konto?</span> <a href="{{ url_for('login') }}"><span
+                            data-i18n="loginLink">Login her</span></a></p>
             </div>
         </div>
     </div>
+
+    <script src="{{ url_for('static', filename='auth.js') }}"></script>
 </body>
+
 </html>

@@ -17,6 +17,9 @@ A web application for converting text to speech using Azure OpenAI TTS and Azure
 - 🔒 **Production-Ready** with security features
 - 🐳 **Docker Support** with Nginx reverse proxy for SSL/TLS
 - 🔐 **HTTPS Support** - Nginx proxy with your own certificates
+- 👤 **User Authentication** - Secure login system with password protection
+- 🔑 **User Management** - Self-service registration (can be disabled)
+- 🛡️ **Access Control** - All TTS features require authentication
 
 ## Prerequisites
 
@@ -65,6 +68,10 @@ AZURE_OPENAI_API_VERSION=2025-03-01-preview
 # Azure Speech Service Configuration (for Speech service)
 AZURE_SPEECH_KEY=your-speech-api-key
 AZURE_SPEECH_REGION=swedencentral
+
+# Authentication Configuration
+SECRET_KEY=your-random-secret-key-here
+ALLOW_REGISTRATION=true
 ```
 
 **To get Azure OpenAI credentials:**
@@ -80,7 +87,23 @@ AZURE_SPEECH_REGION=swedencentral
 3. Go to "Keys and Endpoint"
 4. Copy Key 1 and the Region
 
-#### 5. Run the Application (Development Mode)
+**Authentication Configuration:**
+- `SECRET_KEY` - Random string for session encryption (generate with `python -c "import os; print(os.urandom(24).hex())"`)
+- `ALLOW_REGISTRATION` - Set to `true` to allow new user registration, `false` to disable (default: `true`)
+
+#### 5. Create First User (Required)
+
+Before running the application, you need to create at least one user account. You can do this by:
+
+1. Setting `ALLOW_REGISTRATION=true` in your `.env` file
+2. Starting the application
+3. Navigating to the login page and clicking "Registrer her" / "Register here"
+4. Creating your admin account
+5. Optionally setting `ALLOW_REGISTRATION=false` to disable further registrations
+
+**Note:** User data is stored in `users.json` with password hashing using werkzeug.
+
+#### 6. Run the Application (Development Mode)
 
 For local development and testing:
 
@@ -92,18 +115,20 @@ The application will start on `http://localhost:5000`
 
 **Note:** This runs Flask's development server, which is suitable for testing but not for production. For production deployment, use Docker (see below).
 
-#### 6. Use the Application
+#### 7. Use the Application
 
 1. Open your browser and go to `http://localhost:5000`
-2. **Choose language:** Click 🇩🇰 for Danish or 🇬🇧 for English in the top-right corner
+2. **Log in:** Enter your username and password
+3. **Choose language:** Click 🇩🇰 for Danish or 🇬🇧 for English in the top-right corner
 3. **Select service:** Choose between Azure OpenAI TTS or Azure Speech Service
    - Voices will automatically update based on your service selection
 4. **Select voice:** Pick from available voices (Danish voices listed first for Speech Service)
 5. **Adjust speed:** Use the slider to control speech rate (0.75x - 1.5x)
-6. Enter the text you want to convert to speech
-7. Click "Generer tale" (or "Generate Speech")
-8. Listen to the audio in the browser player
-9. **Download:** Choose MP3 or WAV format and click the download button
+7. Enter the text you want to convert to speech
+8. Click "Generer tale" (or "Generate Speech")
+9. Listen to the audio in the browser player
+10. **Download:** Choose MP3 or WAV format and click the download button
+11. **Log out:** Click the logout button when finished
 
 **Keyboard shortcut:** Press `Ctrl+Enter` in the text area to generate speech quickly
 
@@ -125,18 +150,58 @@ The application will start on `http://localhost:5000`
 - **Nova** - Female voice
 - **Shimmer** - Soft female voice
 
+## User Authentication
+
+The application includes a secure user authentication system:
+
+### Features
+- **Login System** - Flask-Login based session management
+- **Password Security** - Werkzeug password hashing with salted pbkdf2:sha256
+- **User Storage** - JSON-based user database (`users.json`)
+- **Self-Service Registration** - Users can create accounts (optional)
+- **Access Control** - All TTS features require authentication
+- **Bilingual Forms** - Login/register pages support Danish and English
+
+### User Management
+
+**Creating Users:**
+1. Enable registration: Set `ALLOW_REGISTRATION=true` in `.env`
+2. Access the login page
+3. Click "Registrer her" / "Register here"
+4. Enter username and password (minimum 6 characters)
+5. Log in with your new credentials
+
+**Disabling Registration:**
+- Set `ALLOW_REGISTRATION=false` in `.env`
+- Restart the application: `docker-compose down && docker-compose up -d`
+- The registration link will disappear from the login page
+- Direct access to `/register` will redirect to login
+
+**User Data:**
+- Stored in `users.json` in the project root
+- Passwords are hashed and never stored in plain text
+- User sessions use Flask's secure session management with `SECRET_KEY`
+
+**Security Notes:**
+- Always set a strong `SECRET_KEY` in production
+- Disable registration after creating admin accounts
+- Backup `users.json` to preserve user accounts
+- The file is automatically created on first registration
+
 ## Project Structure
 
 ```
 TTSApp-main/
-├── app.py              # Main Flask application with dual TTS service support
+├── app.py              # Main Flask application with authentication and dual TTS
+├── auth.py             # User authentication module
 ├── wsgi.py             # Production WSGI entry point
 ├── requirements.txt    # Python dependencies
+├── users.json          # User database (created automatically, not in git)
 ├── .env                # Your credentials (not in git)
 ├── .env.example        # Example environment configuration
 ├── .gitignore          # Git ignore file
 ├── Dockerfile          # Docker container definition
-├── docker-compose.yml  # Docker Compose with Nginx proxy
+├── docker-compose.yml  # Docker Compose with Nginx proxy and auth volumes
 ├── .dockerignore       # Docker build exclusions
 ├── README.md           # This file
 ├── DOCKER.md           # Docker deployment guide
@@ -149,10 +214,14 @@ TTSApp-main/
 ├── data/
 │   └── audio/          # Persistent audio storage (Docker volume)
 ├── templates/
-│   └── index.html      # Main HTML page with bilingual UI and Gladsaxe branding
+│   ├── index.html      # Main TTS page with bilingual UI
+│   ├── login.html      # Login page with language switcher
+│   └── register.html   # Registration page (optional)
 └── static/
     ├── style.css       # Responsive styles with Gladsaxe Kommune blue theme
-    ├── script.js       # Frontend logic with dynamic voice loading
+    ├── script.js       # TTS frontend logic with dynamic voice loading
+    ├── auth.js         # Authentication page language switcher
+    ├── login.css       # Authentication page styles
     ├── gladsaxe-logo.png  # Gladsaxe Kommune logo
     └── audio/          # Generated audio files (auto-cleaned after 1 hour)
 ```

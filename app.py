@@ -106,15 +106,15 @@ cleanup_old_audio_files()
 def login():
     if current_user.is_authenticated:
         return redirect(url_for('index'))
-    
+
     if request.method == 'POST':
         username = request.form.get('username')
         password = request.form.get('password')
-        
+
         if not username or not password:
             flash('Please provide both username and password', 'error')
-            return render_template('login.html')
-        
+            return render_template('login.html', allow_registration=app.config['ALLOW_REGISTRATION'])
+
         user = get_user_by_username(username)
         if user and user.check_password(password):
             login_user(user)
@@ -122,48 +122,44 @@ def login():
             return redirect(next_page if next_page else url_for('index'))
         else:
             flash('Invalid username or password', 'error')
-    
+
     return render_template('login.html', allow_registration=app.config['ALLOW_REGISTRATION'])
 
 @app.route('/register', methods=['GET', 'POST'])
 def register():
-    print(f"🔍 REGISTER route called - Method: {request.method}")
-    
+    print(f"🔍 REGISTER route - ALLOW_REGISTRATION config: {app.config['ALLOW_REGISTRATION']}")
+
     if not app.config['ALLOW_REGISTRATION']:
-        flash('Registration is currently disabled', 'error')
         return redirect(url_for('login'))
-    
+
     if current_user.is_authenticated:
         return redirect(url_for('index'))
-    
+
     if request.method == 'POST':
         username = request.form.get('username')
         password = request.form.get('password')
         confirm_password = request.form.get('confirm_password')
-        
-        print(f"🔍 Registration attempt - Username: {username}")
-        
+
         if not username or not password or not confirm_password:
             flash('All fields are required', 'error')
             return render_template('register.html')
-        
+
         if password != confirm_password:
             flash('Passwords do not match', 'error')
             return render_template('register.html')
-        
+
         if len(password) < 6:
             flash('Password must be at least 6 characters long', 'error')
             return render_template('register.html')
-        
+
         user, error = create_user(username, password)
         if error:
             flash(error, 'error')
             return render_template('register.html')
-        
-        print(f"✅ User {username} registered successfully")
+
         flash('Registration successful! Please log in.', 'success')
         return redirect(url_for('login'))
-    
+
     return render_template('register.html')
 
 @app.route('/logout')
