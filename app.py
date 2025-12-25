@@ -1,4 +1,4 @@
-﻿from flask import Flask, render_template, request, jsonify, send_file, redirect, url_for, flash
+﻿from flask import Flask, render_template, request, jsonify, send_file, redirect, url_for, flash, session
 from flask_login import LoginManager, login_user, logout_user, login_required, current_user
 from openai import AzureOpenAI
 import os
@@ -10,7 +10,8 @@ import subprocess
 import re
 import html
 from functools import wraps
-from auth import get_user, get_user_by_username, create_user
+from auth import get_user, get_user_by_username, create_user, create_azure_ad_user
+import msal
 
 app = Flask(__name__)
 
@@ -20,6 +21,12 @@ app.config['JSON_SORT_KEYS'] = False
 app.config['SECRET_KEY'] = os.getenv('SECRET_KEY', os.urandom(24).hex())
 app.config['REQUIRE_AUTHENTICATION'] = os.getenv('REQUIRE_AUTHENTICATION', 'true').lower() == 'true'
 app.config['ALLOW_REGISTRATION'] = os.getenv('ALLOW_REGISTRATION', 'true').lower() == 'true'
+
+# Azure AD configuration
+app.config['AZURE_AD_CLIENT_ID'] = os.getenv('AZURE_AD_CLIENT_ID')
+app.config['AZURE_AD_CLIENT_SECRET'] = os.getenv('AZURE_AD_CLIENT_SECRET')
+app.config['AZURE_AD_TENANT_ID'] = os.getenv('AZURE_AD_TENANT_ID')
+app.config['AZURE_AD_REDIRECT_PATH'] = '/login/azure/callback'
 
 # Initialize Flask-Login only if authentication is required
 if app.config['REQUIRE_AUTHENTICATION']:
@@ -41,6 +48,18 @@ def conditional_login_required(f):
             return login_required(f)(*args, **kwargs)
         return f(*args, **kwargs)
     return decorated_function
+
+def get_msal_app():
+    """Create MSAL confidential client application"""
+    if not app.config['AZURE_AD_CLIENT_ID']:
+        return None
+
+    authority = f"https://login.microsoftonline.com/{app.config['AZURE_AD_TENANT_ID']}"
+    return msal.ConfidentialClientApplication(
+        app.config['AZURE_AD_CLIENT_ID'],
+        authority=authority,
+        client_credential=app.config['AZURE_AD_CLIENT_SECRET']
+    )
 
 # Add security headers
 @app.after_request
@@ -128,7 +147,7 @@ def login():
     # If authentication is disabled, redirect to index
     if not app.config['REQUIRE_AUTHENTICATION']:
         return redirect(url_for('index'))
-    
+
     if current_user.is_authenticated:
         return redirect(url_for('index'))
 
@@ -138,7 +157,9 @@ def login():
 
         if not username or not password:
             flash('Indtast venligst både brugernavn og adgangskode', 'error')
-            return render_template('login.html', allow_registration=app.config['ALLOW_REGISTRATION'])
+            return render_template('login.html',
+                                 allow_registration=app.config['ALLOW_REGISTRATION'],
+                                 azure_ad_enabled=bool(app.config['AZURE_AD_CLIENT_ID']))
 
         user = get_user_by_username(username)
         if user and user.check_password(password):
@@ -148,12 +169,100 @@ def login():
         else:
             flash('Ugyldigt brugernavn eller adgangskode', 'error')
 
-    return render_template('login.html', allow_registration=app.config['ALLOW_REGISTRATION'])
+    return render_template('login.html',
+                         allow_registration=app.config['ALLOW_REGISTRATION'],
+                         azure_ad_enabled=bool(app.config['AZURE_AD_CLIENT_ID']))
+
+@app.route('/login/azure')
+def login_azure():
+    """Initiate Azure AD OAuth flow"""
+    if not app.config['REQUIRE_AUTHENTICATION']:
+        return redirect(url_for('index'))
+
+    if current_user.is_authenticated:
+        return redirect(url_for('index'))
+
+    msal_app = get_msal_app()
+    if not msal_app:
+        flash('Azure AD ikke konfigureret', 'error')
+        return redirect(url_for('login'))
+
+    # Generate authorization URL
+    redirect_uri = url_for('login_azure_callback', _external=True)
+    auth_url = msal_app.get_authorization_request_url(
+        scopes=["User.Read"],
+        redirect_uri=redirect_uri
+    )
+
+    return redirect(auth_url)
+
+@app.route('/login/azure/callback')
+def login_azure_callback():
+    """Handle Azure AD OAuth callback"""
+    if not app.config['REQUIRE_AUTHENTICATION']:
+        return redirect(url_for('index'))
+
+    msal_app = get_msal_app()
+    if not msal_app:
+        flash('Azure AD ikke konfigureret', 'error')
+        return redirect(url_for('login'))
+
+    # Get authorization code from query parameters
+    code = request.args.get('code')
+    if not code:
+        error = request.args.get('error_description', 'Ukendt fejl')
+        flash(f'Azure AD login fejlede: {error}', 'error')
+        return redirect(url_for('login'))
+
+    try:
+        # Exchange code for token
+        redirect_uri = url_for('login_azure_callback', _external=True)
+        result = msal_app.acquire_token_by_authorization_code(
+            code,
+            scopes=["User.Read"],
+            redirect_uri=redirect_uri
+        )
+
+        if "error" in result:
+            flash(f'Azure AD login fejlede: {result.get("error_description")}', 'error')
+            return redirect(url_for('login'))
+
+        # Get user info from Microsoft Graph
+        access_token = result['access_token']
+        graph_response = requests.get(
+            'https://graph.microsoft.com/v1.0/me',
+            headers={'Authorization': f'Bearer {access_token}'}
+        )
+
+        if graph_response.status_code != 200:
+            flash('Kunne ikke hente brugeroplysninger fra Azure AD', 'error')
+            return redirect(url_for('login'))
+
+        user_info = graph_response.json()
+        email = user_info.get('mail') or user_info.get('userPrincipalName')
+        display_name = user_info.get('displayName', email.split('@')[0])
+
+        # Create or get Azure AD user
+        user, error = create_azure_ad_user(email, display_name)
+        if error:
+            flash(f'Kunne ikke oprette bruger: {error}', 'error')
+            return redirect(url_for('login'))
+
+        # Log user in
+        login_user(user)
+        flash(f'Velkommen, {display_name}!', 'success')
+
+        next_page = request.args.get('next')
+        return redirect(next_page if next_page else url_for('index'))
+
+    except Exception as e:
+        flash(f'Azure AD login fejlede: {str(e)}', 'error')
+        return redirect(url_for('login'))
 
 @app.route('/register', methods=['GET', 'POST'])
 def register():
     print(f"🔍 REGISTER route - ALLOW_REGISTRATION config: {app.config['ALLOW_REGISTRATION']}")
-    
+
     # If authentication is disabled, redirect to index
     if not app.config['REQUIRE_AUTHENTICATION']:
         return redirect(url_for('index'))

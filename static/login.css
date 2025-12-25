@@ -206,3 +206,52 @@
 .auth-link a:hover {
     text-decoration: underline;
 }
+
+/* Microsoft sign-in button styles */
+.divider {
+    display: flex;
+    align-items: center;
+    text-align: center;
+    margin: 1.5rem 0;
+    color: #999;
+}
+
+.divider::before,
+.divider::after {
+    content: '';
+    flex: 1;
+    border-bottom: 1px solid #e0e0e0;
+}
+
+.divider span {
+    padding: 0 1rem;
+    font-size: 0.9rem;
+}
+
+.btn-microsoft {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.75rem;
+    width: 100%;
+    padding: 0.875rem;
+    background: white;
+    color: #5e5e5e;
+    border: 2px solid #8c8c8c;
+    border-radius: 6px;
+    font-size: 1rem;
+    font-weight: 600;
+    text-decoration: none;
+    cursor: pointer;
+    transition: background 0.3s, border-color 0.3s;
+}
+
+.btn-microsoft:hover {
+    background: #f3f3f3;
+    border-color: #5e5e5e;
+}
+
+.btn-microsoft svg {
+    width: 21px;
+    height: 21px;
+}

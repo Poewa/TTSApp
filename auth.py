@@ -15,13 +15,17 @@ USERS_FILE = DATA_DIR / "users.json"
 
 class User(UserMixin):
     """User class for Flask-Login"""
-    def __init__(self, id, username, password_hash):
+    def __init__(self, id, username, password_hash=None, email=None, is_azure_ad=False):
         self.id = id
         self.username = username
         self.password_hash = password_hash
+        self.email = email
+        self.is_azure_ad = is_azure_ad
 
     def check_password(self, password):
         """Verify password against hash"""
+        if self.is_azure_ad:
+            return False  # Azure AD users don't have local passwords
         return check_password_hash(self.password_hash, password)
 
 def init_users_storage():
@@ -53,7 +57,13 @@ def get_user(user_id):
     users = load_users()
     user_data = users.get(str(user_id))
     if user_data:
-        return User(user_id, user_data['username'], user_data['password_hash'])
+        return User(
+            user_id,
+            user_data['username'],
+            user_data.get('password_hash'),
+            user_data.get('email'),
+            user_data.get('is_azure_ad', False)
+        )
     return None
 
 def get_user_by_username(username):
@@ -61,7 +71,13 @@ def get_user_by_username(username):
     users = load_users()
     for user_id, user_data in users.items():
         if user_data['username'] == username:
-            return User(user_id, user_data['username'], user_data['password_hash'])
+            return User(
+                user_id,
+                user_data['username'],
+                user_data.get('password_hash'),
+                user_data.get('email'),
+                user_data.get('is_azure_ad', False)
+            )
     return None
 
 def create_user(username, password):
@@ -84,6 +100,33 @@ def create_user(username, password):
 
     save_users(users)
     return User(user_id, username, users[user_id]['password_hash']), None
+
+def create_azure_ad_user(email, username):
+    """Create or update an Azure AD user"""
+    users = load_users()
+
+    # Check if user already exists by email
+    for user_id, user_data in users.items():
+        if user_data.get('email') == email:
+            # Update existing user
+            return User(
+                user_id,
+                user_data['username'],
+                None,
+                email,
+                True
+            ), None
+
+    # Create new Azure AD user
+    user_id = str(len(users) + 1)
+    users[user_id] = {
+        'username': username,
+        'email': email,
+        'is_azure_ad': True
+    }
+
+    save_users(users)
+    return User(user_id, username, None, email, True), None
 
 def init_demo_user():
     """Create a demo user if no users exist"""

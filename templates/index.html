@@ -10,8 +10,7 @@
 
 <body>
     <div class="logo-container">
-        <img src="{{ url_for('static', filename='gladsaxe-logo.png') }}" alt="Gladsaxe Kommune"
-            class="kommune-logo">
+        <img src="{{ url_for('static', filename='gladsaxe-logo.png') }}" alt="Gladsaxe Kommune" class="kommune-logo">
     </div>
     <div class="container">
         {% if require_auth and username %}

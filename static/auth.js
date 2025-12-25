@@ -12,6 +12,8 @@
             loginButton: 'Login',
             registerPrompt: 'Har du ikke en konto?',
             registerLink: 'Registrer her',
+            orDivider: 'eller',
+            signInMicrosoft: 'Log ind med Microsoft',
 
             // Register page
             registerTitle: '📝 Registrer',
@@ -28,6 +30,8 @@
             loginButton: 'Login',
             registerPrompt: "Don't have an account?",
             registerLink: 'Register here',
+            orDivider: 'or',
+            signInMicrosoft: 'Sign in with Microsoft',
 
             // Register page
             registerTitle: '📝 Register',

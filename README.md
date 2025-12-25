@@ -20,6 +20,7 @@ A web application for converting text to speech using Azure OpenAI TTS and Azure
 - 👤 **User Authentication** - Secure login system with password protection
 - 🔑 **User Management** - Self-service registration (can be disabled)
 - 🛡️ **Access Control** - All TTS features require authentication
+- 🔵 **Azure AD Integration** - Single sign-on with Microsoft accounts (optional)
 
 ## Prerequisites
 
@@ -71,7 +72,13 @@ AZURE_SPEECH_REGION=swedencentral
 
 # Authentication Configuration
 SECRET_KEY=your-random-secret-key-here
+REQUIRE_AUTHENTICATION=true
 ALLOW_REGISTRATION=true
+
+# Azure AD Configuration (optional - for Microsoft login)
+AZURE_AD_CLIENT_ID=your-azure-ad-client-id
+AZURE_AD_CLIENT_SECRET=your-azure-ad-client-secret
+AZURE_AD_TENANT_ID=your-azure-ad-tenant-id
 ```
 
 **To get Azure OpenAI credentials:**
@@ -89,7 +96,17 @@ ALLOW_REGISTRATION=true
 
 **Authentication Configuration:**
 - `SECRET_KEY` - Random string for session encryption (generate with `python -c "import os; print(os.urandom(24).hex())"`)
+- `REQUIRE_AUTHENTICATION` - Set to `true` to require login, `false` to disable authentication (default: `true`)
 - `ALLOW_REGISTRATION` - Set to `true` to allow new user registration, `false` to disable (default: `true`)
+
+**Azure AD Configuration (Optional):**
+To enable "Sign in with Microsoft" button:
+1. Register an app in [Azure Portal](https://portal.azure.com) → Azure Active Directory → App registrations
+2. Add redirect URI: `http://localhost/login/azure/callback` (and production URL)
+3. Under Authentication, enable "ID tokens"
+4. Under API permissions, add "Microsoft Graph - User.Read" and grant admin consent
+5. Copy Client ID, Client Secret (create under Certificates & secrets), and Tenant ID to `.env`
+6. Users will auto-register on first Azure AD login
 
 #### 5. Create First User (Required)
 
@@ -152,51 +169,88 @@ The application will start on `http://localhost:5000`
 
 ## User Authentication
 
-The application includes a secure user authentication system:
+The application includes a flexible authentication system with support for both local accounts and Azure AD (Microsoft) login:
+
+### Authentication Modes
+
+**Optional Authentication:**
+- Set `REQUIRE_AUTHENTICATION=false` to disable all authentication
+- App becomes publicly accessible without login
+- Useful for internal deployments or kiosk mode
+
+**Local Authentication:**
+- Username/password login with secure password hashing
+- JSON-based user storage in `data/users.json`
+- Self-service registration (can be disabled)
+
+**Azure AD Integration:**
+- "Sign in with Microsoft" button on login page
+- Single sign-on with organizational Microsoft accounts
+- Auto-registers Azure AD users on first login
+- Works alongside local authentication as fallback
 
 ### Features
 - **Login System** - Flask-Login based session management
 - **Password Security** - Werkzeug password hashing with salted pbkdf2:sha256
-- **User Storage** - JSON-based user database (`users.json`)
-- **Self-Service Registration** - Users can create accounts (optional)
-- **Access Control** - All TTS features require authentication
+- **User Storage** - JSON-based user database (`data/users.json`)
+- **Self-Service Registration** - Users can create local accounts (optional)
+- **Azure AD OAuth2** - Microsoft account integration via MSAL library
+- **Auto-Registration** - Azure AD users automatically get accounts on first login
+- **Dual Authentication** - Local and Azure AD work simultaneously
+- **Access Control** - All TTS features require authentication when enabled
 - **Bilingual Forms** - Login/register pages support Danish and English
 
 ### User Management
 
-**Creating Users:**
+**Creating Local Users:**
 1. Enable registration: Set `ALLOW_REGISTRATION=true` in `.env`
 2. Access the login page
 3. Click "Registrer her" / "Register here"
 4. Enter username and password (minimum 6 characters)
 5. Log in with your new credentials
 
+**Azure AD Users:**
+1. Configure Azure AD credentials in `.env` (see setup section above)
+2. Users click "Sign in with Microsoft" on login page
+3. Authenticate with their Microsoft account
+4. Automatically registered on first login
+5. No password needed - uses Microsoft authentication
+
 **Disabling Registration:**
 - Set `ALLOW_REGISTRATION=false` in `.env`
 - Restart the application: `docker-compose down && docker-compose up -d`
 - The registration link will disappear from the login page
 - Direct access to `/register` will redirect to login
+- Azure AD login continues to work and auto-register users
+
+**Disabling Authentication Completely:**
+- Set `REQUIRE_AUTHENTICATION=false` in `.env`
+- Restart the application
+- App becomes publicly accessible without any login
+- Useful for kiosk deployments or trusted internal networks
 
 **User Data:**
-- Stored in `users.json` in the project root
-- Passwords are hashed and never stored in plain text
+- Stored in `data/users.json` (persistent across Docker restarts)
+- Local users have password hashes (never plain text)
+- Azure AD users have email and display name, no password
 - User sessions use Flask's secure session management with `SECRET_KEY`
 
 **Security Notes:**
 - Always set a strong `SECRET_KEY` in production
-- Disable registration after creating admin accounts
-- Backup `users.json` to preserve user accounts
+- Disable registration after creating admin accounts (if using local auth)
+- Keep Azure AD client secret secure (never commit to git)
+- Backup `data/users.json` to preserve user accounts
 - The file is automatically created on first registration
+- Azure AD users are marked with `is_azure_ad: true` flag
 
 ## Project Structure
 
 ```
 TTSApp-main/
 ├── app.py              # Main Flask application with authentication and dual TTS
-├── auth.py             # User authentication module
+├── auth.py             # User authentication module (local + Azure AD)
 ├── wsgi.py             # Production WSGI entry point
-├── requirements.txt    # Python dependencies
-├── users.json          # User database (created automatically, not in git)
+├── requirements.txt    # Python dependencies (includes msal for Azure AD)
 ├── .env                # Your credentials (not in git)
 ├── .env.example        # Example environment configuration
 ├── .gitignore          # Git ignore file
@@ -211,19 +265,20 @@ TTSApp-main/
 │   └── server.key      # Your private key (not in git)
 ├── nginx/              # Nginx reverse proxy configuration
 │   └── nginx.conf      # Nginx server configuration
-├── data/
-│   └── audio/          # Persistent audio storage (Docker volume)
+├── data/               # Persistent data directory (Docker volume)
+│   ├── users.json      # User database (created automatically, not in git)
+│   └── audio/          # Generated audio files (auto-cleaned after 1 hour)
 ├── templates/
 │   ├── index.html      # Main TTS page with bilingual UI
-│   ├── login.html      # Login page with language switcher
+│   ├── login.html      # Login page with Azure AD button
 │   └── register.html   # Registration page (optional)
 └── static/
     ├── style.css       # Responsive styles with Gladsaxe Kommune blue theme
     ├── script.js       # TTS frontend logic with dynamic voice loading
     ├── auth.js         # Authentication page language switcher
-    ├── login.css       # Authentication page styles
+    ├── login.css       # Authentication page styles (includes Microsoft button)
     ├── gladsaxe-logo.png  # Gladsaxe Kommune logo
-    └── audio/          # Generated audio files (auto-cleaned after 1 hour)
+    └── audio/          # Legacy audio directory (not used in Docker)
 ```
 
 ## Troubleshooting

@@ -45,6 +45,22 @@
                 <button type="submit" class="btn-primary" data-i18n="loginButton">Login</button>
             </form>
 
+            {% if azure_ad_enabled %}
+            <div class="divider">
+                <span data-i18n="orDivider">eller</span>
+            </div>
+
+            <a href="{{ url_for('login_azure') }}" class="btn-microsoft">
+                <svg width="21" height="21" viewBox="0 0 21 21" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <rect width="10" height="10" fill="#f25022" />
+                    <rect x="11" width="10" height="10" fill="#00a4ef" />
+                    <rect y="11" width="10" height="10" fill="#7fba00" />
+                    <rect x="11" y="11" width="10" height="10" fill="#ffb900" />
+                </svg>
+                <span data-i18n="signInMicrosoft">Log ind med Microsoft</span>
+            </a>
+            {% endif %}
+
             {% if allow_registration %}
             <div class="auth-link">
                 <p><span data-i18n="registerPrompt">Har du ikke en konto?</span> <a
