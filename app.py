@@ -112,7 +112,7 @@ def login():
         password = request.form.get('password')
 
         if not username or not password:
-            flash('Please provide both username and password', 'error')
+            flash('Indtast venligst både brugernavn og adgangskode', 'error')
             return render_template('login.html', allow_registration=app.config['ALLOW_REGISTRATION'])
 
         user = get_user_by_username(username)
@@ -121,7 +121,7 @@ def login():
             next_page = request.args.get('next')
             return redirect(next_page if next_page else url_for('index'))
         else:
-            flash('Invalid username or password', 'error')
+            flash('Ugyldigt brugernavn eller adgangskode', 'error')
 
     return render_template('login.html', allow_registration=app.config['ALLOW_REGISTRATION'])
 
@@ -141,15 +141,15 @@ def register():
         confirm_password = request.form.get('confirm_password')
 
         if not username or not password or not confirm_password:
-            flash('All fields are required', 'error')
+            flash('Alle felter skal udfyldes', 'error')
             return render_template('register.html')
 
         if password != confirm_password:
-            flash('Passwords do not match', 'error')
+            flash('Adgangskoderne matcher ikke', 'error')
             return render_template('register.html')
 
         if len(password) < 6:
-            flash('Password must be at least 6 characters long', 'error')
+            flash('Adgangskoden skal være mindst 6 tegn lang', 'error')
             return render_template('register.html')
 
         user, error = create_user(username, password)
@@ -157,7 +157,7 @@ def register():
             flash(error, 'error')
             return render_template('register.html')
 
-        flash('Registration successful! Please log in.', 'success')
+        flash('Registrering gennemført! Log venligst ind.', 'success')
         return redirect(url_for('login'))
 
     return render_template('register.html')
@@ -166,7 +166,7 @@ def register():
 @login_required
 def logout():
     logout_user()
-    flash('You have been logged out', 'success')
+    flash('Du er nu logget ud', 'success')
     return redirect(url_for('login'))
 
 @app.route('/')

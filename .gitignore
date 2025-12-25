@@ -7,3 +7,4 @@ static/audio/*.mp3
 venv/
 env/
 .venv/
+users.json
