@@ -26,9 +26,12 @@ services:
       - AZURE_SPEECH_KEY=${AZURE_SPEECH_KEY}
       - AZURE_SPEECH_REGION=${AZURE_SPEECH_REGION}
       - FLASK_ENV=production
-    # Uncomment below to persist audio files between restarts
-    # volumes:
-    #   - ./data/audio:/app/static/audio
+      - SECRET_KEY=${SECRET_KEY:-}
+      - ALLOW_REGISTRATION=${ALLOW_REGISTRATION:-true}
+    volumes:
+      # Persist user data and audio files
+      - ./data:/app/data
+      - ./users.json:/app/users.json
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:5000/"]
