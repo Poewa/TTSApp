@@ -14,6 +14,10 @@
             class="kommune-logo">
     </div>
     <div class="container">
+        <div class="user-info">
+            <span>Logged in as: <strong>{{ username }}</strong></span>
+            <a href="{{ url_for('logout') }}" class="logout-btn">Logout</a>
+        </div>
         <div class="language-toggle">
             <button id="lang-da" class="lang-btn active" data-lang="da">🇩🇰</button>
             <button id="lang-en" class="lang-btn" data-lang="en">🇬🇧</button>

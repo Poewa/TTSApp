@@ -1,4 +1,5 @@
-﻿from flask import Flask, render_template, request, jsonify, send_file
+﻿from flask import Flask, render_template, request, jsonify, send_file, redirect, url_for, flash
+from flask_login import LoginManager, login_user, logout_user, login_required, current_user
 from openai import AzureOpenAI
 import os
 from pathlib import Path
@@ -8,12 +9,24 @@ import requests
 import subprocess
 import re
 import html
+from auth import get_user, get_user_by_username, create_user
 
 app = Flask(__name__)
 
 # Security configurations
 app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024  # 16MB max request size
 app.config['JSON_SORT_KEYS'] = False
+app.config['SECRET_KEY'] = os.getenv('SECRET_KEY', os.urandom(24).hex())
+
+# Initialize Flask-Login
+login_manager = LoginManager()
+login_manager.init_app(app)
+login_manager.login_view = 'login'
+login_manager.login_message = 'Please log in to access this page.'
+
+@login_manager.user_loader
+def load_user(user_id):
+    return get_user(user_id)
 
 # Add security headers
 @app.after_request
@@ -88,11 +101,80 @@ def cleanup_old_audio_files():
 # Run cleanup on startup
 cleanup_old_audio_files()
 
+@app.route('/login', methods=['GET', 'POST'])
+def login():
+    if current_user.is_authenticated:
+        return redirect(url_for('index'))
+    
+    if request.method == 'POST':
+        username = request.form.get('username')
+        password = request.form.get('password')
+        
+        if not username or not password:
+            flash('Please provide both username and password', 'error')
+            return render_template('login.html')
+        
+        user = get_user_by_username(username)
+        if user and user.check_password(password):
+            login_user(user)
+            next_page = request.args.get('next')
+            return redirect(next_page if next_page else url_for('index'))
+        else:
+            flash('Invalid username or password', 'error')
+    
+    return render_template('login.html')
+
+@app.route('/register', methods=['GET', 'POST'])
+def register():
+    print(f"🔍 REGISTER route called - Method: {request.method}")
+    
+    if current_user.is_authenticated:
+        return redirect(url_for('index'))
+    
+    if request.method == 'POST':
+        username = request.form.get('username')
+        password = request.form.get('password')
+        confirm_password = request.form.get('confirm_password')
+        
+        print(f"🔍 Registration attempt - Username: {username}")
+        
+        if not username or not password or not confirm_password:
+            flash('All fields are required', 'error')
+            return render_template('register.html')
+        
+        if password != confirm_password:
+            flash('Passwords do not match', 'error')
+            return render_template('register.html')
+        
+        if len(password) < 6:
+            flash('Password must be at least 6 characters long', 'error')
+            return render_template('register.html')
+        
+        user, error = create_user(username, password)
+        if error:
+            flash(error, 'error')
+            return render_template('register.html')
+        
+        print(f"✅ User {username} registered successfully")
+        flash('Registration successful! Please log in.', 'success')
+        return redirect(url_for('login'))
+    
+    return render_template('register.html')
+
+@app.route('/logout')
+@login_required
+def logout():
+    logout_user()
+    flash('You have been logged out', 'success')
+    return redirect(url_for('login'))
+
 @app.route('/')
+@login_required
 def index():
-    return render_template('index.html')
+    return render_template('index.html', username=current_user.username)
 
 @app.route('/get-voices', methods=['GET'])
+@login_required
 def get_voices():
     """Get available voices for the selected service"""
     try:
@@ -124,6 +206,7 @@ def get_voices():
         return jsonify({'error': str(e)}), 500
 
 @app.route('/generate-speech', methods=['POST'])
+@login_required
 def generate_speech():
     try:
         data = request.json
@@ -237,6 +320,7 @@ def generate_speech():
         return jsonify({'error': str(e)}), 500
 
 @app.route('/download/<filename>')
+@login_required
 def download_file(filename):
     try:
         # Validate filename (we only expect generated UUID filenames like <uuid>.mp3)
