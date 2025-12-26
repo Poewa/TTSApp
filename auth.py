@@ -128,9 +128,3 @@ def create_azure_ad_user(email, username):
     save_users(users)
     return User(user_id, username, None, email, True), None
 
-def init_demo_user():
-    """Create a demo user if no users exist"""
-    users = load_users()
-    if not users:
-        print("📝 Creating demo user: username='demo', password='demo123'")
-        create_user('demo', 'demo123')
