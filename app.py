@@ -106,11 +106,18 @@ AUDIO_DIR = DATA_DIR / "audio"
 # Create directories with exist_ok to handle volume mount permissions
 try:
     DATA_DIR.mkdir(parents=True, exist_ok=True)
+except (PermissionError, FileExistsError):
+    # Directory might already exist from volume mount
+    pass
+
+try:
     AUDIO_DIR.mkdir(parents=True, exist_ok=True)
-except PermissionError:
-    # If we can't create it, it might already exist from volume mount
+except (PermissionError, FileExistsError):
+    # If we can't create it, check if it exists
     if not AUDIO_DIR.exists():
-        raise
+        print(f"⚠️  Warning: Unable to create audio directory at {AUDIO_DIR}")
+        print(f"   Audio files will not be saved. Check directory permissions.")
+    pass
 
 # Audio file cleanup settings
 MAX_FILE_AGE_SECONDS = 3600  # 1 hour
