@@ -37,7 +37,7 @@ docker run -d --name tts-poc -p 5000:5000 \
 **Environment Variables:**
 - `AZURE_OPENAI_API_KEY`, `AZURE_OPENAI_ENDPOINT` (required for OpenAI TTS)
 - `AZURE_SPEECH_KEY`, `AZURE_SPEECH_REGION` (required for Speech Service)
-- `FLASK_ENV=production` (recommended)
+- `AZURE_OPENAI_API_VERSION` (optional, defaults to 2025-03-01-preview)
 
 **Production Recommendations:**
 - Use Docker secrets instead of .env files
