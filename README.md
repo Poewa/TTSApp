@@ -20,7 +20,9 @@ A web application for converting text to speech using Azure OpenAI TTS and Azure
 - 👤 **User Authentication** - Secure login system with password protection
 - 🔑 **User Management** - Self-service registration (can be disabled)
 - 🛡️ **Access Control** - All TTS features require authentication
+- ⏱️ **Rate Limiting** - Protects API usage with configurable request limits
 - 🔵 **Azure AD Integration** - Single sign-on with Microsoft accounts (optional)
+- 💾 **SQLite Storage** - Robust, thread-safe user database for local storage
 
 ## Prerequisites
 
@@ -180,7 +182,7 @@ The application includes a flexible authentication system with support for both 
 
 **Local Authentication:**
 - Username/password login with secure password hashing
-- JSON-based user storage in `data/users.json`
+- SQLite database storage in `data/users.db`
 - Self-service registration (can be disabled)
 
 **Azure AD Integration:**
@@ -192,7 +194,8 @@ The application includes a flexible authentication system with support for both 
 ### Features
 - **Login System** - Flask-Login based session management
 - **Password Security** - Werkzeug password hashing with salted pbkdf2:sha256
-- **User Storage** - JSON-based user database (`data/users.json`)
+- **User Storage** - SQLite user database (`data/users.db`)
+- **Rate Limiting** - Flask-Limiter for protecting endpoints
 - **Self-Service Registration** - Users can create local accounts (optional)
 - **Azure AD OAuth2** - Microsoft account integration via MSAL library
 - **Auto-Registration** - Azure AD users automatically get accounts on first login
@@ -230,10 +233,14 @@ The application includes a flexible authentication system with support for both 
 - Useful for kiosk deployments or trusted internal networks
 
 **User Data:**
-- Stored in `data/users.json` (persistent across Docker restarts)
+- Stored in `data/users.db` (persistent across Docker restarts)
 - Local users have password hashes (never plain text)
 - Azure AD users have email and display name, no password
 - User sessions use Flask's secure session management with `SECRET_KEY`
+
+**Rate Limiting:**
+- The `/generate-speech` endpoint is limited to **5 requests per minute** by default.
+- General API usage is limited to **50 per hour** and **200 per day**.
 
 **Security Notes:**
 - Always set a strong `SECRET_KEY` in production
@@ -266,7 +273,7 @@ TTSApp-main/
 ├── nginx/              # Nginx reverse proxy configuration
 │   └── nginx.conf      # Nginx server configuration
 ├── data/               # Persistent data directory (Docker volume)
-│   ├── users.json      # User database (created automatically, not in git)
+│   ├── users.db        # SQLite user database (created automatically, not in git)
 │   └── audio/          # Generated audio files (auto-cleaned after 1 hour)
 ├── templates/
 │   ├── index.html      # Main TTS page with bilingual UI

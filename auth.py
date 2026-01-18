@@ -1,130 +1,164 @@
-﻿"""
-Simple user authentication module with JSON-based user storage.
-For production, consider using a proper database like PostgreSQL or MySQL.
 """
-import json
+User authentication module using SQLite for persistent storage.
+"""
+import sqlite3
+import logging
 import os
 from pathlib import Path
+from typing import Optional, Tuple, Dict, Any
 from werkzeug.security import generate_password_hash, check_password_hash
 from flask_login import UserMixin
+
+# Configure logging
+logger = logging.getLogger(__name__)
 
 # Use data directory for persistent storage
 DATA_DIR = Path("data")
 DATA_DIR.mkdir(parents=True, exist_ok=True)
-USERS_FILE = DATA_DIR / "users.json"
+DB_FILE = DATA_DIR / "users.db"
 
 class User(UserMixin):
     """User class for Flask-Login"""
-    def __init__(self, id, username, password_hash=None, email=None, is_azure_ad=False):
+    def __init__(self, id: str, username: str, password_hash: Optional[str] = None, 
+                 email: Optional[str] = None, is_azure_ad: bool = False):
         self.id = id
         self.username = username
         self.password_hash = password_hash
         self.email = email
         self.is_azure_ad = is_azure_ad
 
-    def check_password(self, password):
+    def check_password(self, password: str) -> bool:
         """Verify password against hash"""
         if self.is_azure_ad:
             return False  # Azure AD users don't have local passwords
+        if not self.password_hash:
+            return False
         return check_password_hash(self.password_hash, password)
 
-def init_users_storage():
-    """Initialize users storage file"""
-    if not USERS_FILE.exists():
-        try:
-            with open(USERS_FILE, 'w') as f:
-                json.dump({}, f)
-        except Exception as e:
-            print(f"⚠️  Warning: Could not create users file: {e}")
-            print(f"   User data will not persist between restarts")
+def get_db_connection() -> sqlite3.Connection:
+    """Establish and return a database connection"""
+    conn = sqlite3.connect(DB_FILE)
+    conn.row_factory = sqlite3.Row
+    return conn
 
-def load_users():
-    """Load users from JSON file"""
-    init_users_storage()
+def init_db():
+    """Initialize the database schema"""
     try:
-        with open(USERS_FILE, 'r') as f:
-            return json.load(f)
-    except:
-        return {}
-
-def save_users(users_data):
-    """Save users to JSON file"""
-    with open(USERS_FILE, 'w') as f:
-        json.dump(users_data, f, indent=2)
-
-def get_user(user_id):
-    """Get user by ID"""
-    users = load_users()
-    user_data = users.get(str(user_id))
-    if user_data:
-        return User(
-            user_id,
-            user_data['username'],
-            user_data.get('password_hash'),
-            user_data.get('email'),
-            user_data.get('is_azure_ad', False)
-        )
-    return None
-
-def get_user_by_username(username):
-    """Get user by username"""
-    users = load_users()
-    for user_id, user_data in users.items():
-        if user_data['username'] == username:
-            return User(
-                user_id,
-                user_data['username'],
-                user_data.get('password_hash'),
-                user_data.get('email'),
-                user_data.get('is_azure_ad', False)
+        conn = get_db_connection()
+        c = conn.cursor()
+        c.execute('''
+            CREATE TABLE IF NOT EXISTS users (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                username TEXT UNIQUE NOT NULL,
+                password_hash TEXT,
+                email TEXT,
+                is_azure_ad BOOLEAN DEFAULT 0
             )
+        ''')
+        conn.commit()
+        conn.close()
+        logger.info("Database initialized successfully at %s", DB_FILE)
+    except Exception as e:
+        logger.error("Failed to initialize database: %s", e)
+
+# Initialize DB on module load
+init_db()
+
+def get_user(user_id: str) -> Optional[User]:
+    """Get user by ID"""
+    try:
+        conn = get_db_connection()
+        user_data = conn.execute('SELECT * FROM users WHERE id = ?', (user_id,)).fetchone()
+        conn.close()
+
+        if user_data:
+            return User(
+                str(user_data['id']),
+                user_data['username'],
+                user_data['password_hash'],
+                user_data['email'],
+                bool(user_data['is_azure_ad'])
+            )
+    except Exception as e:
+        logger.error("Error retrieving user by ID %s: %s", user_id, e)
     return None
 
-def create_user(username, password):
-    """Create a new user"""
-    users = load_users()
+def get_user_by_username(username: str) -> Optional[User]:
+    """Get user by username"""
+    try:
+        conn = get_db_connection()
+        user_data = conn.execute('SELECT * FROM users WHERE username = ?', (username,)).fetchone()
+        conn.close()
 
-    # Check if username already exists
-    for user_data in users.values():
-        if user_data['username'] == username:
+        if user_data:
+            return User(
+                str(user_data['id']),
+                user_data['username'],
+                user_data['password_hash'],
+                user_data['email'],
+                bool(user_data['is_azure_ad'])
+            )
+    except Exception as e:
+        logger.error("Error retrieving user by username %s: %s", username, e)
+    return None
+
+def create_user(username: str, password: str) -> Tuple[Optional[User], Optional[str]]:
+    """Create a new user"""
+    try:
+        conn = get_db_connection()
+        
+        # Check if username already exists
+        if conn.execute('SELECT 1 FROM users WHERE username = ?', (username,)).fetchone():
+            conn.close()
             return None, "Username already exists"
 
-    # Generate new user ID
-    user_id = str(len(users) + 1)
+        password_hash = generate_password_hash(password)
+        
+        cur = conn.cursor()
+        cur.execute(
+            'INSERT INTO users (username, password_hash, is_azure_ad) VALUES (?, ?, ?)',
+            (username, password_hash, False)
+        )
+        user_id = cur.lastrowid
+        conn.commit()
+        conn.close()
 
-    # Create user
-    users[user_id] = {
-        'username': username,
-        'password_hash': generate_password_hash(password)
-    }
+        return User(str(user_id), username, password_hash), None
 
-    save_users(users)
-    return User(user_id, username, users[user_id]['password_hash']), None
+    except Exception as e:
+        logger.error("Error creating user %s: %s", username, e)
+        return None, "An error occurred during registration"
 
-def create_azure_ad_user(email, username):
+def create_azure_ad_user(email: str, username: str) -> Tuple[Optional[User], Optional[str]]:
     """Create or update an Azure AD user"""
-    users = load_users()
-
-    # Check if user already exists by email
-    for user_id, user_data in users.items():
-        if user_data.get('email') == email:
-            # Update existing user
+    try:
+        conn = get_db_connection()
+        
+        # Check if user already exists by email
+        existing_user = conn.execute('SELECT * FROM users WHERE email = ?', (email,)).fetchone()
+        
+        if existing_user:
+            conn.close()
             return User(
-                user_id,
-                user_data['username'],
+                str(existing_user['id']),
+                existing_user['username'],
                 None,
                 email,
                 True
             ), None
 
-    # Create new Azure AD user
-    user_id = str(len(users) + 1)
-    users[user_id] = {
-        'username': username,
-        'email': email,
-        'is_azure_ad': True
-    }
+        # Create new Azure AD user
+        cur = conn.cursor()
+        cur.execute(
+            'INSERT INTO users (username, email, is_azure_ad) VALUES (?, ?, ?)',
+            (username, email, True)
+        )
+        user_id = cur.lastrowid
+        conn.commit()
+        conn.close()
 
-    save_users(users)
-    return User(user_id, username, None, email, True), None
+        return User(str(user_id), username, None, email, True), None
 
+    except Exception as e:
+        logger.error("Error creating Azure AD user %s: %s", email, e)
+        return None, "An error occurred during Azure AD login"

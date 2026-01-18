@@ -1,5 +1,7 @@
-﻿from flask import Flask, render_template, request, jsonify, send_file, redirect, url_for, flash, session
+from flask import Flask, render_template, request, jsonify, send_file, redirect, url_for, flash, session
 from flask_login import LoginManager, login_user, logout_user, login_required, current_user
+from flask_limiter import Limiter
+from flask_limiter.util import get_remote_address
 from openai import AzureOpenAI
 import os
 from pathlib import Path
@@ -10,11 +12,25 @@ import subprocess
 import re
 import html
 import json
+import logging
 from functools import wraps
-from auth import get_user, get_user_by_username, create_user, create_azure_ad_user
+from typing import Optional, Dict, List, Any, Union
+from auth import get_user, get_user_by_username, create_user, create_azure_ad_user, User
 import msal
 
+# Configure logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
+
 app = Flask(__name__)
+
+# Initialize Limiter
+limiter = Limiter(
+    get_remote_address,
+    app=app,
+    default_limits=["200 per day", "50 per hour"],
+    storage_uri="memory://"
+)
 
 # --- Configuration Loading ---
 
@@ -59,14 +75,14 @@ try:
     speech_service_voices_json = os.getenv('SPEECH_SERVICE_VOICES')
     app.config['SPEECH_SERVICE_VOICES'] = json.loads(speech_service_voices_json) if speech_service_voices_json else DEFAULT_SPEECH_SERVICE_VOICES
 except json.JSONDecodeError:
-    app.logger.warning("Invalid JSON in SPEECH_SERVICE_VOICES env var. Using default voices.")
+    logger.warning("Invalid JSON in SPEECH_SERVICE_VOICES env var. Using default voices.")
     app.config['SPEECH_SERVICE_VOICES'] = DEFAULT_SPEECH_SERVICE_VOICES
 
 try:
     openai_voices_json = os.getenv('OPENAI_VOICES')
     app.config['OPENAI_VOICES'] = json.loads(openai_voices_json) if openai_voices_json else DEFAULT_OPENAI_VOICES
 except json.JSONDecodeError:
-    app.logger.warning("Invalid JSON in OPENAI_VOICES env var. Using default voices.")
+    logger.warning("Invalid JSON in OPENAI_VOICES env var. Using default voices.")
     app.config['OPENAI_VOICES'] = DEFAULT_OPENAI_VOICES
 
 
@@ -78,7 +94,7 @@ if app.config['REQUIRE_AUTHENTICATION']:
     login_manager.login_message = 'Please log in to access this page.'
 
     @login_manager.user_loader
-    def load_user(user_id):
+    def load_user(user_id: str) -> Optional[User]:
         return get_user(user_id)
 
 # Conditional login requirement decorator
@@ -91,7 +107,7 @@ def conditional_login_required(f):
         return f(*args, **kwargs)
     return decorated_function
 
-def get_msal_app():
+def get_msal_app() -> Optional[msal.ConfidentialClientApplication]:
     """Create MSAL confidential client application"""
     if not app.config['AZURE_AD_CLIENT_ID']:
         return None
@@ -120,7 +136,7 @@ AZURE_API_KEY = os.getenv("AZURE_OPENAI_API_KEY")
 AZURE_ENDPOINT = os.getenv("AZURE_OPENAI_ENDPOINT")
 AZURE_API_VERSION = os.getenv("AZURE_OPENAI_API_VERSION", "2024-02-15-preview")
 
-client = None
+client: Optional[AzureOpenAI] = None
 if AZURE_API_KEY and AZURE_ENDPOINT:
     client = AzureOpenAI(
         api_key=AZURE_API_KEY,
@@ -128,20 +144,20 @@ if AZURE_API_KEY and AZURE_ENDPOINT:
         azure_endpoint=AZURE_ENDPOINT,
         timeout=app.config['AZURE_OPENAI_TIMEOUT'],
     )
-    app.logger.info("✅ Azure OpenAI client configured successfully")
+    logger.info("✅ Azure OpenAI client configured successfully")
 else:
-    app.logger.warning("⚠️  Running in DEMO mode - Azure OpenAI credentials not configured")
-    app.logger.warning("   Set AZURE_OPENAI_API_KEY and AZURE_OPENAI_ENDPOINT to enable TTS")
+    logger.warning("⚠️  Running in DEMO mode - Azure OpenAI credentials not configured")
+    logger.warning("   Set AZURE_OPENAI_API_KEY and AZURE_OPENAI_ENDPOINT to enable TTS")
 
 # Configure Azure Speech Service
 AZURE_SPEECH_KEY = os.getenv("AZURE_SPEECH_KEY")
 AZURE_SPEECH_REGION = os.getenv("AZURE_SPEECH_REGION")
 
 if AZURE_SPEECH_KEY and AZURE_SPEECH_REGION:
-    app.logger.info(f"✅ Azure Speech Service configured with region: {AZURE_SPEECH_REGION}")
+    logger.info(f"✅ Azure Speech Service configured with region: {AZURE_SPEECH_REGION}")
 else:
-    app.logger.warning("⚠️  Azure Speech Service not configured")
-    app.logger.warning("   Set AZURE_SPEECH_KEY and AZURE_SPEECH_REGION to enable Speech Service")
+    logger.warning("⚠️  Azure Speech Service not configured")
+    logger.warning("   Set AZURE_SPEECH_KEY and AZURE_SPEECH_REGION to enable Speech Service")
 
 # Create directory for audio files inside data directory
 DATA_DIR = Path("data")
@@ -158,11 +174,11 @@ try:
 except (PermissionError, FileExistsError):
     # If we can't create it, check if it exists
     if not AUDIO_DIR.exists():
-        app.logger.warning(f"⚠️  Warning: Unable to create audio directory at {AUDIO_DIR}")
-        app.logger.warning(f"   Audio files will not be saved. Check directory permissions.")
+        logger.warning(f"⚠️  Warning: Unable to create audio directory at {AUDIO_DIR}")
+        logger.warning(f"   Audio files will not be saved. Check directory permissions.")
     pass
 
-def cleanup_old_audio_files():
+def cleanup_old_audio_files() -> int:
     """Remove audio files older than MAX_FILE_AGE_SECONDS"""
     try:
         current_time = time.time()
@@ -180,10 +196,10 @@ def cleanup_old_audio_files():
                         pass
 
         if deleted_count > 0:
-            app.logger.info(f"🧹 Cleaned up {deleted_count} old audio file(s)")
+            logger.info(f"🧹 Cleaned up {deleted_count} old audio file(s)")
         return deleted_count
     except Exception as e:
-        app.logger.error(f"⚠️  Error during audio cleanup: {e}")
+        logger.error(f"⚠️  Error during audio cleanup: {e}")
         return 0
 
 # Run cleanup on startup
@@ -306,7 +322,7 @@ def login_azure_callback():
 
 @app.route('/register', methods=['GET', 'POST'])
 def register():
-    app.logger.info(f"🔍 REGISTER route - ALLOW_REGISTRATION config: {app.config['ALLOW_REGISTRATION']}")
+    logger.info(f"🔍 REGISTER route - ALLOW_REGISTRATION config: {app.config['ALLOW_REGISTRATION']}")
 
     # If authentication is disabled, redirect to index
     if not app.config['REQUIRE_AUTHENTICATION']:
@@ -375,6 +391,7 @@ def get_voices():
 
 @app.route('/generate-speech', methods=['POST'])
 @conditional_login_required
+@limiter.limit("5 per minute")  # Rate limit: 5 requests per minute per user/IP
 def generate_speech():
     try:
         data = request.json
@@ -383,7 +400,7 @@ def generate_speech():
         service = data.get('service', 'openai')
         speed = data.get('speed', 1.0)
 
-        app.logger.info(f"📝 Request received - Service: {service}, Voice: {voice}, Speed: {speed}x, Text length: {len(text)}")
+        logger.info(f"📝 Request received - Service: {service}, Voice: {voice}, Speed: {speed}x, Text length: {len(text)}")
 
         # Input validation
         if not text:
@@ -425,14 +442,14 @@ def generate_speech():
                 if response.status_code == 200:
                     with open(filepath, 'wb') as audio_file:
                         audio_file.write(response.content)
-                    app.logger.info(f"✅ Speech synthesized with Azure Speech Service (voice: {voice})")
+                    logger.info(f"✅ Speech synthesized with Azure Speech Service (voice: {voice})")
                 else:
                     error_msg = f"Azure Speech Service error: {response.status_code} - {response.text}"
-                    app.logger.error(f"❌ {error_msg}")
+                    logger.error(f"❌ {error_msg}")
                     return jsonify({'error': error_msg}), 500
             except Exception as e:
                 error_msg = f"Failed to connect to Azure Speech Service: {str(e)}"
-                app.logger.error(f"❌ {error_msg}")
+                logger.error(f"❌ {error_msg}")
                 return jsonify({'error': error_msg}), 500
         else:
             if not client:
@@ -445,13 +462,13 @@ def generate_speech():
                 speed=speed
             )
             response.stream_to_file(str(filepath))
-            app.logger.info(f"✅ Speech synthesized with OpenAI TTS (voice: {voice})")
+            logger.info(f"✅ Speech synthesized with OpenAI TTS (voice: {voice})")
 
         cleanup_old_audio_files()
 
         return jsonify({'success': True, 'audio_url': f'/audio/{filename}', 'filename': filename})
     except Exception as e:
-        app.logger.error(f"Error in generate_speech: {e}", exc_info=True)
+        logger.error(f"Error in generate_speech: {e}", exc_info=True)
         return jsonify({'error': str(e)}), 500
 
 @app.route('/audio/<filename>')

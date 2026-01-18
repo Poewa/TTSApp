@@ -59,9 +59,10 @@ docker rm tts-poc
 
 ### Built-in Security
 
-✅ **Non-root user** - Container runs as unprivileged user (UID 1000)
-✅ **Gunicorn** - Production-grade WSGI server instead of Flask dev server
-✅ **Security headers** - X-Frame-Options, CSP, XSS protection
+✅ Non-root user - Container runs as unprivileged user (UID 1000)
+✅ Gunicorn - Production-grade WSGI server instead of Flask dev server
+✅ Rate Limiting - Built-in protection via Flask-Limiter
+✅ Security headers - X-Frame-Options, CSP, XSS protection
 ✅ **Request size limits** - 16MB max to prevent DoS
 ✅ **No debug mode** - Debug disabled in production
 ✅ **Minimal image** - Based on python:3.13-slim
