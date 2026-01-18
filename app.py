@@ -9,15 +9,16 @@ import requests
 import subprocess
 import re
 import html
+import json
 from functools import wraps
 from auth import get_user, get_user_by_username, create_user, create_azure_ad_user
 import msal
 
 app = Flask(__name__)
 
+# --- Configuration Loading ---
+
 # Security configurations
-app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024  # 16MB max request size
-app.config['JSON_SORT_KEYS'] = False
 app.config['SECRET_KEY'] = os.getenv('SECRET_KEY', os.urandom(24).hex())
 app.config['REQUIRE_AUTHENTICATION'] = os.getenv('REQUIRE_AUTHENTICATION', 'true').lower() == 'true'
 app.config['ALLOW_REGISTRATION'] = os.getenv('ALLOW_REGISTRATION', 'true').lower() == 'true'
@@ -27,6 +28,47 @@ app.config['AZURE_AD_CLIENT_ID'] = os.getenv('AZURE_AD_CLIENT_ID')
 app.config['AZURE_AD_CLIENT_SECRET'] = os.getenv('AZURE_AD_CLIENT_SECRET')
 app.config['AZURE_AD_TENANT_ID'] = os.getenv('AZURE_AD_TENANT_ID')
 app.config['AZURE_AD_REDIRECT_PATH'] = '/login/azure/callback'
+
+# Model and limits configuration
+app.config['AZURE_OPENAI_MODEL'] = os.getenv('AZURE_OPENAI_MODEL', 'tts-hd')
+app.config['AZURE_OPENAI_TIMEOUT'] = int(os.getenv('AZURE_OPENAI_TIMEOUT', 30))
+app.config['MAX_TEXT_LENGTH'] = int(os.getenv('MAX_TEXT_LENGTH', 10000))
+app.config['MAX_FILE_AGE_SECONDS'] = int(os.getenv('MAX_FILE_AGE_SECONDS', 3600))
+app.config['MAX_CONTENT_LENGTH'] = int(os.getenv('MAX_CONTENT_LENGTH', 16 * 1024 * 1024))
+app.config['JSON_SORT_KEYS'] = False
+
+# --- Default Voice Lists ---
+DEFAULT_SPEECH_SERVICE_VOICES = [
+    {'name': 'da-DK-ChristelNeural', 'displayName': 'Christel (DK Female)', 'language': 'da-DK'},
+    {'name': 'da-DK-JeppeNeural', 'displayName': 'Jeppe (DK Male)', 'language': 'da-DK'},
+    {'name': 'en-GB-SoniaNeural', 'displayName': 'Sonia (UK Female)', 'language': 'en-GB'},
+    {'name': 'en-GB-RyanNeural', 'displayName': 'Ryan (UK Male)', 'language': 'en-GB'},
+]
+
+DEFAULT_OPENAI_VOICES = [
+    {'name': 'alloy', 'displayName': 'Alloy', 'language': 'en-US'},
+    {'name': 'echo', 'displayName': 'Echo', 'language': 'en-US'},
+    {'name': 'fable', 'displayName': 'Fable', 'language': 'en-US'},
+    {'name': 'onyx', 'displayName': 'Onyx', 'language': 'en-US'},
+    {'name': 'nova', 'displayName': 'Nova', 'language': 'en-US'},
+    {'name': 'shimmer', 'displayName': 'Shimmer', 'language': 'en-US'},
+]
+
+# --- Load Voices from Environment or Use Defaults ---
+try:
+    speech_service_voices_json = os.getenv('SPEECH_SERVICE_VOICES')
+    app.config['SPEECH_SERVICE_VOICES'] = json.loads(speech_service_voices_json) if speech_service_voices_json else DEFAULT_SPEECH_SERVICE_VOICES
+except json.JSONDecodeError:
+    app.logger.warning("Invalid JSON in SPEECH_SERVICE_VOICES env var. Using default voices.")
+    app.config['SPEECH_SERVICE_VOICES'] = DEFAULT_SPEECH_SERVICE_VOICES
+
+try:
+    openai_voices_json = os.getenv('OPENAI_VOICES')
+    app.config['OPENAI_VOICES'] = json.loads(openai_voices_json) if openai_voices_json else DEFAULT_OPENAI_VOICES
+except json.JSONDecodeError:
+    app.logger.warning("Invalid JSON in OPENAI_VOICES env var. Using default voices.")
+    app.config['OPENAI_VOICES'] = DEFAULT_OPENAI_VOICES
+
 
 # Initialize Flask-Login only if authentication is required
 if app.config['REQUIRE_AUTHENTICATION']:
@@ -83,22 +125,23 @@ if AZURE_API_KEY and AZURE_ENDPOINT:
     client = AzureOpenAI(
         api_key=AZURE_API_KEY,
         api_version=AZURE_API_VERSION,
-        azure_endpoint=AZURE_ENDPOINT
+        azure_endpoint=AZURE_ENDPOINT,
+        timeout=app.config['AZURE_OPENAI_TIMEOUT'],
     )
-    print("✅ Azure OpenAI client configured successfully")
+    app.logger.info("✅ Azure OpenAI client configured successfully")
 else:
-    print("⚠️  Running in DEMO mode - Azure OpenAI credentials not configured")
-    print("   Set AZURE_OPENAI_API_KEY and AZURE_OPENAI_ENDPOINT to enable TTS")
+    app.logger.warning("⚠️  Running in DEMO mode - Azure OpenAI credentials not configured")
+    app.logger.warning("   Set AZURE_OPENAI_API_KEY and AZURE_OPENAI_ENDPOINT to enable TTS")
 
 # Configure Azure Speech Service
 AZURE_SPEECH_KEY = os.getenv("AZURE_SPEECH_KEY")
 AZURE_SPEECH_REGION = os.getenv("AZURE_SPEECH_REGION")
 
 if AZURE_SPEECH_KEY and AZURE_SPEECH_REGION:
-    print(f"✅ Azure Speech Service configured with region: {AZURE_SPEECH_REGION}")
+    app.logger.info(f"✅ Azure Speech Service configured with region: {AZURE_SPEECH_REGION}")
 else:
-    print("⚠️  Azure Speech Service not configured")
-    print("   Set AZURE_SPEECH_KEY and AZURE_SPEECH_REGION to enable Speech Service")
+    app.logger.warning("⚠️  Azure Speech Service not configured")
+    app.logger.warning("   Set AZURE_SPEECH_KEY and AZURE_SPEECH_REGION to enable Speech Service")
 
 # Create directory for audio files inside data directory
 DATA_DIR = Path("data")
@@ -115,12 +158,9 @@ try:
 except (PermissionError, FileExistsError):
     # If we can't create it, check if it exists
     if not AUDIO_DIR.exists():
-        print(f"⚠️  Warning: Unable to create audio directory at {AUDIO_DIR}")
-        print(f"   Audio files will not be saved. Check directory permissions.")
+        app.logger.warning(f"⚠️  Warning: Unable to create audio directory at {AUDIO_DIR}")
+        app.logger.warning(f"   Audio files will not be saved. Check directory permissions.")
     pass
-
-# Audio file cleanup settings
-MAX_FILE_AGE_SECONDS = 3600  # 1 hour
 
 def cleanup_old_audio_files():
     """Remove audio files older than MAX_FILE_AGE_SECONDS"""
@@ -132,7 +172,7 @@ def cleanup_old_audio_files():
         for pattern in ("*.mp3", "*.wav"):
             for audio_file in AUDIO_DIR.glob(pattern):
                 file_age = current_time - audio_file.stat().st_mtime
-                if file_age > MAX_FILE_AGE_SECONDS:
+                if file_age > app.config['MAX_FILE_AGE_SECONDS']:
                     try:
                         audio_file.unlink()
                         deleted_count += 1
@@ -140,10 +180,10 @@ def cleanup_old_audio_files():
                         pass
 
         if deleted_count > 0:
-            print(f"🧹 Cleaned up {deleted_count} old audio file(s)")
+            app.logger.info(f"🧹 Cleaned up {deleted_count} old audio file(s)")
         return deleted_count
     except Exception as e:
-        print(f"⚠️  Error during audio cleanup: {e}")
+        app.logger.error(f"⚠️  Error during audio cleanup: {e}")
         return 0
 
 # Run cleanup on startup
@@ -266,7 +306,7 @@ def login_azure_callback():
 
 @app.route('/register', methods=['GET', 'POST'])
 def register():
-    print(f"🔍 REGISTER route - ALLOW_REGISTRATION config: {app.config['ALLOW_REGISTRATION']}")
+    app.logger.info(f"🔍 REGISTER route - ALLOW_REGISTRATION config: {app.config['ALLOW_REGISTRATION']}")
 
     # If authentication is disabled, redirect to index
     if not app.config['REQUIRE_AUTHENTICATION']:
@@ -325,28 +365,10 @@ def get_voices():
     """Get available voices for the selected service"""
     try:
         service = request.args.get('service', 'openai')
-
         if service == 'speech':
-            # Azure Speech Service voices - Danish and UK English only
-            voices = [
-                # Danish voices (default)
-                {'name': 'da-DK-ChristelNeural', 'displayName': 'Christel (DK Female)', 'language': 'da-DK'},
-                {'name': 'da-DK-JeppeNeural', 'displayName': 'Jeppe (DK Male)', 'language': 'da-DK'},
-                # UK English voices
-                {'name': 'en-GB-SoniaNeural', 'displayName': 'Sonia (UK Female)', 'language': 'en-GB'},
-                {'name': 'en-GB-RyanNeural', 'displayName': 'Ryan (UK Male)', 'language': 'en-GB'},
-            ]
+            voices = app.config['SPEECH_SERVICE_VOICES']
         else:
-            # Azure OpenAI TTS voices
-            voices = [
-                {'name': 'alloy', 'displayName': 'Alloy', 'language': 'en-US'},
-                {'name': 'echo', 'displayName': 'Echo', 'language': 'en-US'},
-                {'name': 'fable', 'displayName': 'Fable', 'language': 'en-US'},
-                {'name': 'onyx', 'displayName': 'Onyx', 'language': 'en-US'},
-                {'name': 'nova', 'displayName': 'Nova', 'language': 'en-US'},
-                {'name': 'shimmer', 'displayName': 'Shimmer', 'language': 'en-US'},
-            ]
-
+            voices = app.config['OPENAI_VOICES']
         return jsonify({'voices': voices})
     except Exception as e:
         return jsonify({'error': str(e)}), 500
@@ -358,111 +380,78 @@ def generate_speech():
         data = request.json
         text = data.get('text', '')
         voice = data.get('voice', 'alloy')
-        service = data.get('service', 'openai')  # 'openai' or 'speech'
-        speed = data.get('speed', 1.0)  # Speed multiplier (0.5 to 2.0)
+        service = data.get('service', 'openai')
+        speed = data.get('speed', 1.0)
 
-        print(f"📝 Request received - Service: {service}, Voice: {voice}, Speed: {speed}x, Text length: {len(text)}")
+        app.logger.info(f"📝 Request received - Service: {service}, Voice: {voice}, Speed: {speed}x, Text length: {len(text)}")
 
         # Input validation
         if not text:
             return jsonify({'error': 'No text provided'}), 400
 
-        if len(text) > 10000:  # Reasonable limit for TTS
-            return jsonify({'error': 'Text too long. Maximum 10,000 characters allowed.'}), 400
+        max_len = app.config['MAX_TEXT_LENGTH']
+        if len(text) > max_len:
+            return jsonify({'error': f'Text too long. Maximum {max_len} characters allowed.'}), 400
 
-        # Validate service selection
         if service not in ['openai', 'speech']:
             return jsonify({'error': 'Invalid service selection'}), 400
 
-        # Validate speed range
         if not (0.25 <= speed <= 4.0):
             return jsonify({'error': 'Invalid speed value. Must be between 0.25 and 4.0'}), 400
 
-        # Generate unique filename
         filename = f"{uuid.uuid4()}.mp3"
         filepath = AUDIO_DIR / filename
 
         if service == 'speech':
-            # Use Azure Speech Service REST API
             if not AZURE_SPEECH_KEY or not AZURE_SPEECH_REGION:
-                return jsonify({
-                    'error': 'Azure Speech Service is not configured. Please set AZURE_SPEECH_KEY and AZURE_SPEECH_REGION in your .env file.'
-                }), 503
+                return jsonify({'error': 'Azure Speech Service is not configured.'}), 503
 
-            # Construct the REST API endpoint
             speech_url = f"https://{AZURE_SPEECH_REGION}.tts.speech.microsoft.com/cognitiveservices/v1"
-
-            # Prepare headers with higher quality audio format
             headers = {
                 'Ocp-Apim-Subscription-Key': AZURE_SPEECH_KEY,
                 'Content-Type': 'application/ssml+xml',
-                'X-Microsoft-OutputFormat': 'audio-24khz-96kbitrate-mono-mp3',  # Higher quality
+                'X-Microsoft-OutputFormat': 'audio-24khz-96kbitrate-mono-mp3',
                 'User-Agent': 'TTSApp'
             }
-
-            # Prepare SSML body with speed control
-            # Convert speed (0.5-2.0) to percentage for SSML rate
-            # Clamp to safe range to avoid artifacts
             rate_percent = max(-50, min(100, int((speed - 1.0) * 100)))
             rate_str = f"+{rate_percent}%" if rate_percent > 0 else f"{rate_percent}%"
-
-            # Escape text to prevent SSML injection
             safe_text = html.escape(text)
-
             ssml = f"""<speak version='1.0' xml:lang='en-US'>
-                <voice xml:lang='en-US' name='{voice}'>
-                    <prosody rate='{rate_str}'>
-                        {safe_text}
-                    </prosody>
-                </voice>
+                <voice xml:lang='en-US' name='{voice}'><prosody rate='{rate_str}'>{safe_text}</prosody></voice>
             </speak>"""
 
             try:
-                # Make request to Azure Speech Service
                 response = requests.post(speech_url, headers=headers, data=ssml.encode('utf-8'), timeout=30)
-
                 if response.status_code == 200:
-                    # Save the audio file
                     with open(filepath, 'wb') as audio_file:
                         audio_file.write(response.content)
-                    print(f"✅ Speech synthesized successfully with Azure Speech Service (voice: {voice})")
+                    app.logger.info(f"✅ Speech synthesized with Azure Speech Service (voice: {voice})")
                 else:
                     error_msg = f"Azure Speech Service error: {response.status_code} - {response.text}"
-                    print(f"❌ {error_msg}")
+                    app.logger.error(f"❌ {error_msg}")
                     return jsonify({'error': error_msg}), 500
             except Exception as e:
                 error_msg = f"Failed to connect to Azure Speech Service: {str(e)}"
-                print(f"❌ {error_msg}")
+                app.logger.error(f"❌ {error_msg}")
                 return jsonify({'error': error_msg}), 500
         else:
-            # Use Azure OpenAI TTS
             if not client:
-                return jsonify({
-                    'error': 'Azure OpenAI is not configured. Please set AZURE_OPENAI_API_KEY and AZURE_OPENAI_ENDPOINT in your .env file to enable text-to-speech functionality.'
-                }), 503
+                return jsonify({'error': 'Azure OpenAI is not configured.'}), 503
 
-            # Call Azure OpenAI TTS API with speed control
             response = client.audio.speech.create(
-                model="tts-hd",  # Your deployment name
+                model=app.config['AZURE_OPENAI_MODEL'],
                 voice=voice,
                 input=text,
                 speed=speed
             )
-
-            # Save the audio file
             response.stream_to_file(str(filepath))
-            print(f"✅ Speech synthesized successfully with OpenAI TTS (voice: {voice})")
+            app.logger.info(f"✅ Speech synthesized with OpenAI TTS (voice: {voice})")
 
-        # Cleanup old files after generating new one
         cleanup_old_audio_files()
 
-        return jsonify({
-            'success': True,
-            'audio_url': f'/audio/{filename}',
-            'filename': filename
-        })
-
+        return jsonify({'success': True, 'audio_url': f'/audio/{filename}', 'filename': filename})
     except Exception as e:
+        app.logger.error(f"Error in generate_speech: {e}", exc_info=True)
         return jsonify({'error': str(e)}), 500
 
 @app.route('/audio/<filename>')
@@ -470,7 +459,6 @@ def generate_speech():
 def serve_audio(filename):
     """Serve audio files from data directory"""
     try:
-        # Validate filename
         if not re.match(r'^[a-f0-9\-]+\.mp3$', filename):
             return jsonify({'error': 'Invalid filename'}), 400
 
@@ -486,7 +474,6 @@ def serve_audio(filename):
 @conditional_login_required
 def download_file(filename):
     try:
-        # Validate filename (we only expect generated UUID filenames like <uuid>.mp3)
         if not re.match(r'^[a-f0-9\-]+\.mp3$', filename):
             return jsonify({'error': 'Invalid filename'}), 400
 
@@ -494,27 +481,20 @@ def download_file(filename):
         if not filepath.exists():
             return jsonify({'error': 'File not found'}), 404
 
-        # Optional format query parameter: ?format=wav or ?format=mp3
         fmt = request.args.get('format', 'mp3').lower()
         if fmt == 'mp3':
             return send_file(filepath, as_attachment=True)
         elif fmt == 'wav':
-            # Check if WAV already exists (cache)
             stem = filepath.stem
             wav_path = AUDIO_DIR / f"{stem}.wav"
             if not wav_path.exists():
-                # Convert mp3 -> wav using ffmpeg
                 try:
-                    # Use a safe, fixed ffmpeg command. Overwrite if exists (-y).
-                    subprocess.run([
-                        'ffmpeg', '-y', '-i', str(filepath),
-                        '-ar', '24000',  # sample rate 24kHz
-                        '-ac', '1',      # mono
-                        str(wav_path)
-                    ], check=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-                except subprocess.CalledProcessError as e:
+                    subprocess.run(
+                        ['ffmpeg', '-y', '-i', str(filepath), '-ar', '24000', '-ac', '1', str(wav_path)],
+                        check=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL
+                    )
+                except subprocess.CalledProcessError:
                     return jsonify({'error': 'Failed to convert to WAV'}), 500
-
             return send_file(wav_path, as_attachment=True)
         else:
             return jsonify({'error': 'Unsupported format'}), 400
@@ -522,6 +502,5 @@ def download_file(filename):
         return jsonify({'error': str(e)}), 500
 
 if __name__ == '__main__':
-    # Only use debug mode in development
     debug_mode = os.getenv('FLASK_ENV') != 'production'
     app.run(debug=debug_mode, host='0.0.0.0', port=5000)
