@@ -16,7 +16,7 @@
 }
 
 .login-box {
-    background: white;
+    background: var(--white);
     border-radius: 12px;
     box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
     padding: 2.5rem;
@@ -26,7 +26,7 @@
 
 .login-box h1 {
     text-align: center;
-    color: #2c3e50;
+    color: var(--text-main);
     margin-bottom: 2rem;
     font-size: 1.8rem;
 }
@@ -35,7 +35,7 @@
     display: flex;
     gap: 0.5rem;
     margin-bottom: 2rem;
-    border-bottom: 2px solid #e0e0e0;
+    border-bottom: 2px solid var(--border-color);
 }
 
 .tab-btn {
@@ -47,17 +47,17 @@
     cursor: pointer;
     font-size: 1rem;
     font-weight: 600;
-    color: #666;
+    color: var(--text-secondary);
     transition: all 0.3s;
 }
 
 .tab-btn:hover {
-    color: #3498db;
+    color: var(--primary-color);
 }
 
 .tab-btn.active {
-    color: #3498db;
-    border-bottom-color: #3498db;
+    color: var(--primary-color);
+    border-bottom-color: var(--primary-color);
 }
 
 .auth-form {
@@ -75,14 +75,14 @@
 .form-group label {
     display: block;
     margin-bottom: 0.5rem;
-    color: #2c3e50;
+    color: var(--text-main);
     font-weight: 600;
 }
 
 .form-group input {
     width: 100%;
     padding: 0.75rem;
-    border: 2px solid #e0e0e0;
+    border: 2px solid var(--border-color);
     border-radius: 6px;
     font-size: 1rem;
     transition: border-color 0.3s;
@@ -90,14 +90,14 @@
 
 .form-group input:focus {
     outline: none;
-    border-color: #3498db;
+    border-color: var(--primary-color);
 }
 
 .btn-primary {
     width: 100%;
     padding: 0.875rem;
-    background: linear-gradient(135deg, #3498db, #2980b9);
-    color: white;
+    background: linear-gradient(135deg, var(--primary-color), var(--primary-dark));
+    color: var(--white);
     border: none;
     border-radius: 6px;
     font-size: 1rem;
@@ -108,7 +108,7 @@
 
 .btn-primary:hover {
     transform: translateY(-2px);
-    box-shadow: 0 4px 12px rgba(52, 152, 219, 0.3);
+    box-shadow: 0 4px 12px rgba(var(--primary-rgb), 0.3);
 }
 
 .btn-primary:active {
@@ -118,19 +118,19 @@
 .demo-info {
     margin-top: 1.5rem;
     padding: 1rem;
-    background: #f8f9fa;
+    background: var(--bg-light);
     border-radius: 6px;
     text-align: center;
 }
 
 .demo-info p {
     margin: 0.25rem 0;
-    color: #666;
+    color: var(--text-secondary);
     font-size: 0.9rem;
 }
 
 .demo-info strong {
-    color: #2c3e50;
+    color: var(--text-main);
 }
 
 .alert {
@@ -141,15 +141,15 @@
 }
 
 .alert-error {
-    background: #fee;
-    color: #c33;
-    border: 1px solid #fcc;
+    background: var(--error-bg);
+    color: var(--error-text);
+    border: 1px solid var(--error-border);
 }
 
 .alert-success {
-    background: #efe;
-    color: #3c3;
-    border: 1px solid #cfc;
+    background: var(--success-bg);
+    color: var(--success-text);
+    border: 1px solid var(--success-border);
 }
 
 /* User info bar styles for main page */
@@ -164,17 +164,17 @@
 }
 
 .user-info span {
-    color: #666;
+    color: var(--text-secondary);
 }
 
 .user-info strong {
-    color: #2c3e50;
+    color: var(--text-main);
 }
 
 .logout-btn {
     padding: 0.5rem 1rem;
-    background: #e74c3c;
-    color: white;
+    background: var(--error-text); /* Using error text color for logout (red) or maybe explicit red? */
+    color: var(--white);
     text-decoration: none;
     border-radius: 6px;
     font-size: 0.9rem;
@@ -193,12 +193,12 @@
 }
 
 .auth-link p {
-    color: #666;
+    color: var(--text-secondary);
     margin: 0;
 }
 
 .auth-link a {
-    color: #3498db;
+    color: var(--primary-color);
     text-decoration: none;
     font-weight: 600;
 }
@@ -220,7 +220,7 @@
 .divider::after {
     content: '';
     flex: 1;
-    border-bottom: 1px solid #e0e0e0;
+    border-bottom: 1px solid var(--border-color);
 }
 
 .divider span {
@@ -235,7 +235,7 @@
     gap: 0.75rem;
     width: 100%;
     padding: 0.875rem;
-    background: white;
+    background: var(--white);
     color: #5e5e5e;
     border: 2px solid #8c8c8c;
     border-radius: 6px;

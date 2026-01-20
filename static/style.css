@@ -1,4 +1,25 @@
-﻿* {
+﻿:root {
+    --primary-rgb: 0, 81, 165;
+    --primary-color: rgb(var(--primary-rgb));
+    --primary-dark: #003B7A;
+    --accent-color: rgb(var(--primary-rgb));
+    --background-start: rgb(var(--primary-rgb));
+    --background-end: var(--primary-dark);
+    --text-main: #333333;
+    --text-secondary: #666666;
+    --text-label: #444444;
+    --border-color: #e0e0e0;
+    --white: #ffffff;
+    --success-color: #28a745;
+    --error-bg: #f8d7da;
+    --error-text: #721c24;
+    --error-border: #f5c6cb;
+    --success-bg: #d4edda;
+    --success-text: #155724;
+    --success-border: #c3e6cb;
+}
+
+* {
     margin: 0;
     padding: 0;
     box-sizing: border-box;
@@ -6,7 +27,7 @@
 
 body {
     font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
-    background: linear-gradient(135deg, #0051A5 0%, #003B7A 100%);
+    background: linear-gradient(135deg, var(--background-start) 0%, var(--background-end) 100%);
     min-height: 100vh;
     display: flex;
     justify-content: center;
@@ -15,7 +36,7 @@ body {
 }
 
 .container {
-    background: white;
+    background: var(--white);
     border-radius: 20px;
     padding: 40px;
     max-width: 700px;
@@ -44,14 +65,14 @@ body {
 }
 
 .lang-btn:hover {
-    background: #e0e0e0;
+    background: var(--border-color);
     transform: scale(1.05);
 }
 
 .lang-btn.active {
-    border-color: #0051A5;
+    border-color: var(--primary-color);
     background: #E6F0FF;
-    box-shadow: 0 2px 8px rgba(0, 81, 165, 0.3);
+    box-shadow: 0 2px 8px rgba(var(--primary-rgb), 0.3);
 }
 
 .logo-container {
@@ -68,7 +89,7 @@ body {
 }
 
 h1 {
-    color: #333;
+    color: var(--text-main);
     text-align: center;
     margin-bottom: 10px;
     margin-top: 0;
@@ -78,7 +99,7 @@ h1 {
 
 .subtitle {
     text-align: center;
-    color: #666;
+    color: var(--text-secondary);
     margin-bottom: 30px;
     font-size: 0.9em;
     min-height: 20px;
@@ -91,14 +112,14 @@ h1 {
 label {
     display: block;
     margin-bottom: 8px;
-    color: #444;
+    color: var(--text-label);
     font-weight: 600;
 }
 
 #text-input {
     width: 100%;
     padding: 15px;
-    border: 2px solid #e0e0e0;
+    border: 2px solid var(--border-color);
     border-radius: 10px;
     font-size: 16px;
     font-family: inherit;
@@ -108,7 +129,7 @@ label {
 
 #text-input:focus {
     outline: none;
-    border-color: #0051A5;
+    border-color: var(--primary-color);
 }
 
 .controls {
@@ -126,10 +147,10 @@ label {
 #service-select {
     width: 100%;
     padding: 12px;
-    border: 2px solid #e0e0e0;
+    border: 2px solid var(--border-color);
     border-radius: 10px;
     font-size: 16px;
-    background: white;
+    background: var(--white);
     cursor: pointer;
     transition: border-color 0.3s;
 }
@@ -137,16 +158,16 @@ label {
 #voice-select:focus,
 #service-select:focus {
     outline: none;
-    border-color: #0051A5;
+    border-color: var(--primary-color);
 }
 
 /* Ensure the download format select matches the other dropdowns visually */
 #download-format {
     padding: 12px;
-    border: 2px solid #e0e0e0;
+    border: 2px solid var(--border-color);
     border-radius: 10px;
     font-size: 16px;
-    background: white;
+    background: var(--white);
     cursor: pointer;
     transition: border-color 0.3s;
     height: 48px;
@@ -154,7 +175,7 @@ label {
 
 #download-format:focus {
     outline: none;
-    border-color: #0051A5;
+    border-color: var(--primary-color);
 }
 
 /* Normalize select appearance across browsers (fix Firefox native arrow differences) */
@@ -180,14 +201,14 @@ label {
 
 #speed-value {
     font-weight: 600;
-    color: #0051A5;
+    color: var(--primary-color);
     margin-left: 5px;
 }
 
 .generate-btn {
     padding: 12px 30px;
-    background: linear-gradient(135deg, #0051A5 0%, #003B7A 100%);
-    color: white;
+    background: linear-gradient(135deg, var(--primary-color) 0%, var(--primary-dark) 100%);
+    color: var(--white);
     border: none;
     border-radius: 10px;
     font-size: 16px;
@@ -198,7 +219,7 @@ label {
 
 .generate-btn:hover {
     transform: translateY(-2px);
-    box-shadow: 0 5px 20px rgba(0, 81, 165, 0.4);
+    box-shadow: 0 5px 20px rgba(var(--primary-rgb), 0.4);
 }
 
 .generate-btn:active {
@@ -218,7 +239,7 @@ label {
 
 .spinner {
     border: 4px solid #f3f3f3;
-    border-top: 4px solid #0051A5;
+    border-top: 4px solid var(--primary-color);
     border-radius: 50%;
     width: 50px;
     height: 50px;
@@ -244,7 +265,7 @@ label {
 }
 
 .result-section h2 {
-    color: #333;
+    color: var(--text-main);
     font-size: 1.5em;
     margin-bottom: 20px;
 }
@@ -262,29 +283,29 @@ label {
 }
 
 .download-section label {
-    color: #444;
+    color: var(--text-label);
     font-weight: 600;
 }
 
 #download-format {
     padding: 12px;
-    border: 2px solid #e0e0e0;
+    border: 2px solid var(--border-color);
     border-radius: 10px;
     font-size: 16px;
-    background: white;
+    background: var(--white);
     cursor: pointer;
     transition: border-color 0.3s;
 }
 
 #download-format:focus {
     outline: none;
-    border-color: #0051A5;
+    border-color: var(--primary-color);
 }
 
 .download-btn {
     padding: 12px 30px;
-    background: #28a745;
-    color: white;
+    background: var(--success-color);
+    color: var(--white);
     border: none;
     border-radius: 10px;
     font-size: 16px;
@@ -303,11 +324,11 @@ label {
 }
 
 .error-message {
-    background: #f8d7da;
-    color: #721c24;
+    background: var(--error-bg);
+    color: var(--error-text);
     padding: 15px;
     border-radius: 10px;
-    border: 1px solid #f5c6cb;
+    border: 1px solid var(--error-border);
     margin-top: 20px;
 }
 

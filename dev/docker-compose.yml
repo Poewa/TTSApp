@@ -1,0 +1,23 @@
+version: "3.8"
+
+services:
+  tts-app:
+    build: .
+    container_name: tts-poc-dev
+    ports:
+      - "5000:5000"
+    environment:
+      - FLASK_ENV=development
+      - FLASK_DEBUG=1
+      - SECRET_KEY=dev_secret
+      - REQUIRE_AUTHENTICATION=false
+      # Dummy values to satisfy any strict checks, though app handles missing keys gracefully
+      - AZURE_OPENAI_API_KEY=dummy
+      - AZURE_OPENAI_ENDPOINT=https://dummy.openai.azure.com/
+      - AZURE_SPEECH_KEY=dummy
+      - AZURE_SPEECH_REGION=eastus
+    volumes:
+      - .:/app
+      - ./data:/app/data
+    # Override default command (gunicorn) to use Flask development server for hot-reloading
+    command: python app.py
