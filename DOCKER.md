@@ -31,6 +31,27 @@ docker run -d --name tts-poc -p 5000:5000 \
   tts-poc
 ```
 
+
+## Development Environment
+
+For local development with hot-reloading (changes reflect immediately):
+
+```bash
+# 1. Create data directory (required)
+mkdir -p data/audio
+
+# 2. Enter dev directory
+cd dev
+
+# 3. Start dev container
+docker-compose up
+```
+
+**Features:**
+- Mounts local directory for live code updates
+- Runs with `FLASK_DEBUG=1` (Werkzeug debugger enabled)
+- Port 5000 mapped to host
+
 ## Security & Configuration
 
 **Built-in Security:**
