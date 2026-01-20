@@ -10,5 +10,9 @@ env/
 users.db
 users.json
 
+# Data directories (should be created manually)
+data/
+dev/data/
+
 # Snyk Security Extension - AI Rules (auto-generated)
 .github/instructions/snyk_rules.instructions.md
