@@ -1,4 +1,4 @@
-version: "3.8"
+
 
 services:
   tts-app:
@@ -17,7 +17,7 @@ services:
       - AZURE_SPEECH_KEY=dummy
       - AZURE_SPEECH_REGION=eastus
     volumes:
-      - .:/app
+      - ../:/app
       - ./data:/app/data
     # Override default command (gunicorn) to use Flask development server for hot-reloading
     command: python app.py

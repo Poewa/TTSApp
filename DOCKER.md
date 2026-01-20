@@ -7,6 +7,9 @@
 cp .env.example .env
 # Edit .env with your Azure credentials
 
+# 2. Prepare data directory (fixes permission issues)
+mkdir -p data/audio
+
 # 2. Start with Docker Compose
 docker-compose up -d
 
@@ -85,3 +88,6 @@ docker-compose logs -f web | grep ERROR
 - Missing environment variables → Check .env file
 - Port 5000 in use → Change port in docker-compose.yml
 - High memory usage → Increase limits in docker-compose.yml
+- **Permission denied (data/audio):**
+  - Cause: Docker created `data` folder as root.
+  - Fix: `sudo chown -R 1000:1000 data` or create folder manually before running docker.

@@ -29,6 +29,7 @@ Fill in your Azure credentials and preferred settings:
 ### 2. Run with Docker
 
 ```bash
+mkdir -p data/audio  # Prevents permission issues
 docker compose up -d
 ```
 
