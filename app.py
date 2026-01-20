@@ -17,6 +17,8 @@ from functools import wraps
 from typing import Optional, Dict, List, Any, Union
 from auth import get_user, get_user_by_username, create_user, create_azure_ad_user, User
 import msal
+from urllib.parse import urlparse, urljoin # Added for security check
+
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -118,6 +120,13 @@ def get_msal_app() -> Optional[msal.ConfidentialClientApplication]:
         authority=authority,
         client_credential=app.config['AZURE_AD_CLIENT_SECRET']
     )
+
+# Security helper function
+def is_safe_url(target):
+    ref_url = urlparse(request.host_url)
+    test_url = urlparse(urljoin(request.host_url, target))
+    return test_url.scheme in ('http', 'https') and \
+           ref_url.netloc == test_url.netloc
 
 # Add security headers
 @app.after_request
@@ -228,7 +237,9 @@ def login():
         if user and user.check_password(password):
             login_user(user)
             next_page = request.args.get('next')
-            return redirect(next_page if next_page else url_for('index'))
+            if not next_page or not is_safe_url(next_page):
+                next_page = url_for('index')
+            return redirect(next_page)
         else:
             flash('Ugyldigt brugernavn eller adgangskode', 'error')
 
@@ -314,7 +325,9 @@ def login_azure_callback():
         # Log user in
         login_user(user)
         next_page = request.args.get('next')
-        return redirect(next_page if next_page else url_for('index'))
+        if not next_page or not is_safe_url(next_page):
+            next_page = url_for('index')
+        return redirect(next_page)
 
     except Exception as e:
         flash(f'Azure AD login fejlede: {str(e)}', 'error')

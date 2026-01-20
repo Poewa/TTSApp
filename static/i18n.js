@@ -21,7 +21,11 @@ function setLanguage(lang) {
             const username = element.querySelector('strong');
             if (username) {
                 const usernameText = username.textContent;
-                element.innerHTML = `${translations[lang][key]} <strong>${usernameText}</strong>`;
+                // Securely update text without innerHTML
+                element.textContent = translations[lang][key] + ' ';
+                const strongTag = document.createElement('strong');
+                strongTag.textContent = usernameText;
+                element.appendChild(strongTag);
             }
         } else if (translations[lang] && translations[lang][key]) {
             element.textContent = translations[lang][key];
@@ -43,7 +47,7 @@ function setLanguage(lang) {
 document.addEventListener('DOMContentLoaded', async () => {
     await loadTranslations();
     const langButtons = document.querySelectorAll('.lang-btn');
-    
+
     langButtons.forEach(btn => {
         btn.addEventListener('click', () => {
             setLanguage(btn.getAttribute('data-lang'));

@@ -2,7 +2,7 @@ version: "3.8"
 
 services:
   tts-app:
-    build: .
+    image: ghcr.io/poewa/ttsapp:latest
     container_name: tts-poc-dev
     ports:
       - "5000:5000"
