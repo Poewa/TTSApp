@@ -214,6 +214,95 @@ def cleanup_old_audio_files() -> int:
 # Run cleanup on startup
 cleanup_old_audio_files()
 
+# --- TTS synthesis helpers ---
+
+class TTSConfigError(Exception):
+    """Raised when the requested TTS service is not configured."""
+
+class TTSGenerationError(Exception):
+    """Raised when speech synthesis or audio processing fails."""
+
+
+def synthesize_to_file(text: str, voice: str, service: str, speed: float) -> Path:
+    """Synthesize a single text segment to a new mp3 file and return its path.
+
+    Raises TTSConfigError if the selected service is not configured, or
+    TTSGenerationError if synthesis fails.
+    """
+    filename = f"{uuid.uuid4()}.mp3"
+    filepath = AUDIO_DIR / filename
+
+    if service == 'speech':
+        if not AZURE_SPEECH_KEY or not AZURE_SPEECH_REGION:
+            raise TTSConfigError('Azure Speech Service is not configured.')
+
+        speech_url = f"https://{AZURE_SPEECH_REGION}.tts.speech.microsoft.com/cognitiveservices/v1"
+        headers = {
+            'Ocp-Apim-Subscription-Key': AZURE_SPEECH_KEY,
+            'Content-Type': 'application/ssml+xml',
+            'X-Microsoft-OutputFormat': 'audio-24khz-96kbitrate-mono-mp3',
+            'User-Agent': 'TTSApp'
+        }
+        rate_percent = max(-50, min(100, int((speed - 1.0) * 100)))
+        rate_str = f"+{rate_percent}%" if rate_percent > 0 else f"{rate_percent}%"
+        safe_text = html.escape(text)
+        ssml = f"""<speak version='1.0' xml:lang='en-US'>
+            <voice xml:lang='en-US' name='{voice}'><prosody rate='{rate_str}'>{safe_text}</prosody></voice>
+        </speak>"""
+
+        try:
+            response = requests.post(speech_url, headers=headers, data=ssml.encode('utf-8'), timeout=30)
+        except Exception as e:
+            raise TTSGenerationError(f"Failed to connect to Azure Speech Service: {str(e)}")
+
+        if response.status_code != 200:
+            raise TTSGenerationError(f"Azure Speech Service error: {response.status_code} - {response.text}")
+
+        with open(filepath, 'wb') as audio_file:
+            audio_file.write(response.content)
+        logger.info(f"✅ Speech synthesized with Azure Speech Service (voice: {voice})")
+    else:
+        if not client:
+            raise TTSConfigError('Azure OpenAI is not configured.')
+
+        response = client.audio.speech.create(
+            model=app.config['AZURE_OPENAI_MODEL'],
+            voice=voice,
+            input=text,
+            speed=speed
+        )
+        response.stream_to_file(str(filepath))
+        logger.info(f"✅ Speech synthesized with OpenAI TTS (voice: {voice})")
+
+    return filepath
+
+
+def concatenate_audio(segments: List[Path], output_path: Path, gap_seconds: float = 0.7) -> None:
+    """Concatenate exactly two mp3 segments into output_path with a silent gap between them.
+
+    Uses ffmpeg's apad + concat filter so no intermediate silence file is needed.
+    Raises TTSGenerationError if ffmpeg fails.
+    """
+    if len(segments) != 2:
+        raise TTSGenerationError("concatenate_audio expects exactly two segments")
+
+    filter_complex = (
+        f"[0:a]apad=pad_dur={gap_seconds}[a0];"
+        f"[a0][1:a]concat=n=2:v=0:a=1[out]"
+    )
+    try:
+        subprocess.run(
+            ['ffmpeg', '-y',
+             '-i', str(segments[0]),
+             '-i', str(segments[1]),
+             '-filter_complex', filter_complex,
+             '-map', '[out]',
+             str(output_path)],
+            check=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL
+        )
+    except (subprocess.CalledProcessError, FileNotFoundError) as e:
+        raise TTSGenerationError(f"Failed to combine audio segments: {str(e)}")
+
 @app.route('/login', methods=['GET', 'POST'])
 def login():
     # If authentication is disabled, redirect to index
@@ -429,59 +518,86 @@ def generate_speech():
         if not (0.25 <= speed <= 4.0):
             return jsonify({'error': 'Invalid speed value. Must be between 0.25 and 4.0'}), 400
 
-        filename = f"{uuid.uuid4()}.mp3"
-        filepath = AUDIO_DIR / filename
-
-        if service == 'speech':
-            if not AZURE_SPEECH_KEY or not AZURE_SPEECH_REGION:
-                return jsonify({'error': 'Azure Speech Service is not configured.'}), 503
-
-            speech_url = f"https://{AZURE_SPEECH_REGION}.tts.speech.microsoft.com/cognitiveservices/v1"
-            headers = {
-                'Ocp-Apim-Subscription-Key': AZURE_SPEECH_KEY,
-                'Content-Type': 'application/ssml+xml',
-                'X-Microsoft-OutputFormat': 'audio-24khz-96kbitrate-mono-mp3',
-                'User-Agent': 'TTSApp'
-            }
-            rate_percent = max(-50, min(100, int((speed - 1.0) * 100)))
-            rate_str = f"+{rate_percent}%" if rate_percent > 0 else f"{rate_percent}%"
-            safe_text = html.escape(text)
-            ssml = f"""<speak version='1.0' xml:lang='en-US'>
-                <voice xml:lang='en-US' name='{voice}'><prosody rate='{rate_str}'>{safe_text}</prosody></voice>
-            </speak>"""
-
-            try:
-                response = requests.post(speech_url, headers=headers, data=ssml.encode('utf-8'), timeout=30)
-                if response.status_code == 200:
-                    with open(filepath, 'wb') as audio_file:
-                        audio_file.write(response.content)
-                    logger.info(f"✅ Speech synthesized with Azure Speech Service (voice: {voice})")
-                else:
-                    error_msg = f"Azure Speech Service error: {response.status_code} - {response.text}"
-                    logger.error(f"❌ {error_msg}")
-                    return jsonify({'error': error_msg}), 500
-            except Exception as e:
-                error_msg = f"Failed to connect to Azure Speech Service: {str(e)}"
-                logger.error(f"❌ {error_msg}")
-                return jsonify({'error': error_msg}), 500
-        else:
-            if not client:
-                return jsonify({'error': 'Azure OpenAI is not configured.'}), 503
-
-            response = client.audio.speech.create(
-                model=app.config['AZURE_OPENAI_MODEL'],
-                voice=voice,
-                input=text,
-                speed=speed
-            )
-            response.stream_to_file(str(filepath))
-            logger.info(f"✅ Speech synthesized with OpenAI TTS (voice: {voice})")
+        try:
+            filepath = synthesize_to_file(text, voice, service, speed)
+        except TTSConfigError as e:
+            return jsonify({'error': str(e)}), 503
+        except TTSGenerationError as e:
+            logger.error(f"❌ {e}")
+            return jsonify({'error': str(e)}), 500
 
         cleanup_old_audio_files()
 
-        return jsonify({'success': True, 'audio_url': f'/audio/{filename}', 'filename': filename})
+        return jsonify({'success': True, 'audio_url': f'/audio/{filepath.name}', 'filename': filepath.name})
     except Exception as e:
         logger.error(f"Error in generate_speech: {e}", exc_info=True)
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/generate-combined', methods=['POST'])
+@conditional_login_required
+@limiter.limit("5 per minute")  # Rate limit: 5 requests per minute per user/IP
+def generate_combined():
+    """Generate a single audio file combining a Danish then an English segment."""
+    intermediates: List[Path] = []
+    try:
+        data = request.json
+        text_da = (data.get('text_da') or '').strip()
+        text_en = (data.get('text_en') or '').strip()
+        voice_da = data.get('voice_da')
+        voice_en = data.get('voice_en')
+        service = data.get('service', 'speech')
+        speed = data.get('speed', 1.0)
+
+        logger.info(
+            f"📝 Combined request - Service: {service}, DK voice: {voice_da}, EN voice: {voice_en}, "
+            f"Speed: {speed}x, DK len: {len(text_da)}, EN len: {len(text_en)}"
+        )
+
+        # Input validation
+        if not text_da or not text_en:
+            return jsonify({'error': 'Both Danish and English text are required'}), 400
+
+        max_len = app.config['MAX_TEXT_LENGTH']
+        if len(text_da) > max_len or len(text_en) > max_len:
+            return jsonify({'error': f'Text too long. Maximum {max_len} characters allowed per language.'}), 400
+
+        if service not in ['openai', 'speech']:
+            return jsonify({'error': 'Invalid service selection'}), 400
+
+        if not voice_da or not voice_en:
+            return jsonify({'error': 'A voice must be selected for each language'}), 400
+
+        if not (0.25 <= speed <= 4.0):
+            return jsonify({'error': 'Invalid speed value. Must be between 0.25 and 4.0'}), 400
+
+        try:
+            # Danish first, then English
+            da_path = synthesize_to_file(text_da, voice_da, service, speed)
+            intermediates.append(da_path)
+            en_path = synthesize_to_file(text_en, voice_en, service, speed)
+            intermediates.append(en_path)
+
+            output_filename = f"{uuid.uuid4()}.mp3"
+            output_path = AUDIO_DIR / output_filename
+            concatenate_audio([da_path, en_path], output_path)
+        except TTSConfigError as e:
+            return jsonify({'error': str(e)}), 503
+        except TTSGenerationError as e:
+            logger.error(f"❌ {e}")
+            return jsonify({'error': str(e)}), 500
+        finally:
+            # Remove intermediate single-language files; keep only the combined output
+            for path in intermediates:
+                try:
+                    path.unlink()
+                except OSError:
+                    pass
+
+        cleanup_old_audio_files()
+
+        return jsonify({'success': True, 'audio_url': f'/audio/{output_filename}', 'filename': output_filename})
+    except Exception as e:
+        logger.error(f"Error in generate_combined: {e}", exc_info=True)
         return jsonify({'error': str(e)}), 500
 
 @app.route('/audio/<filename>')
