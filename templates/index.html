@@ -21,9 +21,27 @@
         <h1 data-i18n="title">🎙️ Tekst-til-tale Generator</h1>
 
         <div class="input-section">
-            <label for="text-input" data-i18n="inputLabel">Indtast din tekst:</label>
-            <textarea id="text-input" data-i18n-placeholder="inputPlaceholder"
-                placeholder="Skriv eller indsæt din tekst her..." rows="6"></textarea>
+            <div class="mode-toggle">
+                <button id="mode-single" class="mode-btn active" data-mode="single" data-i18n="modeSingle">Enkelt</button>
+                <button id="mode-combined" class="mode-btn" data-mode="combined" data-i18n="modeCombined">Dansk + Engelsk</button>
+            </div>
+
+            <!-- Single mode input -->
+            <div id="single-input">
+                <label for="text-input" data-i18n="inputLabel">Indtast din tekst:</label>
+                <textarea id="text-input" data-i18n-placeholder="inputPlaceholder"
+                    placeholder="Skriv eller indsæt din tekst her..." rows="6"></textarea>
+            </div>
+
+            <!-- Combined mode input (Danish + English) -->
+            <div id="combined-input" style="display: none;">
+                <label for="text-input-da" data-i18n="danishTextLabel">Dansk tekst:</label>
+                <textarea id="text-input-da" data-i18n-placeholder="danishTextPlaceholder"
+                    placeholder="Skriv eller indsæt din danske tekst her..." rows="4"></textarea>
+                <label for="text-input-en" data-i18n="englishTextLabel" style="margin-top: 15px;">Engelsk tekst:</label>
+                <textarea id="text-input-en" data-i18n-placeholder="englishTextPlaceholder"
+                    placeholder="Type or paste your English text here..." rows="4"></textarea>
+            </div>
 
             <div class="controls">
                 <div class="voice-selector">
@@ -34,11 +52,22 @@
                     </select>
                 </div>
 
-                <div class="voice-selector">
+                <!-- Single mode voice -->
+                <div class="voice-selector" id="single-voice-wrap">
                     <label for="voice-select" data-i18n="voiceLabel">Vælg stemme:</label>
                     <select id="voice-select">
                         <!-- Voices will be loaded dynamically -->
                     </select>
+                </div>
+
+                <!-- Combined mode voices -->
+                <div class="voice-selector" id="combined-voice-wrap" style="display: none;">
+                    <label for="voice-select-da" data-i18n="danishVoiceLabel">Dansk stemme:</label>
+                    <select id="voice-select-da"></select>
+                </div>
+                <div class="voice-selector" id="combined-voice-wrap-en" style="display: none;">
+                    <label for="voice-select-en" data-i18n="englishVoiceLabel">Engelsk stemme:</label>
+                    <select id="voice-select-en"></select>
                 </div>
 
                 <div class="voice-selector">
@@ -83,7 +112,7 @@
     </div>
 
     <script src="{{ url_for('static', filename='i18n.js') }}?v=1"></script>
-    <script src="{{ url_for('static', filename='script.js') }}?v=3"></script>
+    <script src="{{ url_for('static', filename='script.js') }}?v=4"></script>
 </body>
 
 </html>

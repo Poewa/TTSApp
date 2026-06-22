@@ -109,6 +109,35 @@ h1 {
     margin-bottom: 30px;
 }
 
+.mode-toggle {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 20px;
+}
+
+.mode-btn {
+    flex: 1;
+    background: #f0f0f0;
+    border: 2px solid transparent;
+    border-radius: 8px;
+    padding: 10px;
+    font-size: 15px;
+    font-weight: 600;
+    color: var(--text-label);
+    cursor: pointer;
+    transition: all 0.3s;
+}
+
+.mode-btn:hover {
+    background: var(--border-color);
+}
+
+.mode-btn.active {
+    border-color: var(--primary-color);
+    background: #E6F0FF;
+    color: var(--primary-color);
+}
+
 label {
     display: block;
     margin-bottom: 8px;
@@ -116,7 +145,9 @@ label {
     font-weight: 600;
 }
 
-#text-input {
+#text-input,
+#text-input-da,
+#text-input-en {
     width: 100%;
     padding: 15px;
     border: 2px solid var(--border-color);
@@ -127,13 +158,16 @@ label {
     transition: border-color 0.3s;
 }
 
-#text-input:focus {
+#text-input:focus,
+#text-input-da:focus,
+#text-input-en:focus {
     outline: none;
     border-color: var(--primary-color);
 }
 
 .controls {
     display: flex;
+    flex-wrap: wrap;
     gap: 15px;
     margin-top: 20px;
     align-items: flex-end;
@@ -144,6 +178,8 @@ label {
 }
 
 #voice-select,
+#voice-select-da,
+#voice-select-en,
 #service-select {
     width: 100%;
     padding: 12px;
@@ -156,6 +192,8 @@ label {
 }
 
 #voice-select:focus,
+#voice-select-da:focus,
+#voice-select-en:focus,
 #service-select:focus {
     outline: none;
     border-color: var(--primary-color);
