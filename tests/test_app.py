@@ -97,6 +97,35 @@ def test_combined_happy_path_danish_first(noauth_client):
     assert segments == [fake_da, fake_en]
 
 
+def test_generate_speech_rejects_unknown_voice(noauth_client):
+    """A voice outside the configured allow-list must be rejected before synthesis
+    (prevents SSML/attribute injection via the `voice` field)."""
+    with patch('app.synthesize_to_file') as mock_synth:
+        response = noauth_client.post('/generate-speech', json={
+            'text': 'Hello',
+            'voice': "alloy'><audio src='https://attacker.example/x.mp3'/><voice name='alloy",
+            'service': 'openai',
+            'speed': 1.0
+        })
+    assert response.status_code == 400
+    mock_synth.assert_not_called()
+
+
+def test_combined_rejects_unknown_voice(noauth_client):
+    """Both combined voices must be in the allow-list for the chosen service."""
+    with patch('app.synthesize_to_file') as mock_synth:
+        response = noauth_client.post('/generate-combined', json={
+            'text_da': 'Hej',
+            'text_en': 'Hello',
+            'voice_da': 'da-DK-ChristelNeural',
+            'voice_en': "en-GB-SoniaNeural'/><audio src='https://attacker.example/x.mp3'/>",
+            'service': 'speech',
+            'speed': 1.0
+        })
+    assert response.status_code == 400
+    mock_synth.assert_not_called()
+
+
 def test_generate_speech_still_works(noauth_client):
     """Regression: the refactored single-text endpoint still returns the file."""
     fake = Path('data/audio/cccccccc-0000-0000-0000-000000000000.mp3')

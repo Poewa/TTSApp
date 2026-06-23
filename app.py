@@ -122,6 +122,19 @@ def get_msal_app() -> Optional[msal.ConfidentialClientApplication]:
     )
 
 # Security helper function
+def is_allowed_voice(voice: str, service: str) -> bool:
+    """Return True only if `voice` is one of the configured voices for the service.
+
+    Voices are user-supplied and get interpolated into SSML / passed to the TTS
+    backend, so they must be whitelisted against the known voice list rather than
+    trusted directly.
+    """
+    if service == 'speech':
+        allowed = app.config['SPEECH_SERVICE_VOICES']
+    else:
+        allowed = app.config['OPENAI_VOICES']
+    return any(voice == v.get('name') for v in allowed)
+
 def is_safe_url(target):
     ref_url = urlparse(request.host_url)
     test_url = urlparse(urljoin(request.host_url, target))
@@ -246,8 +259,9 @@ def synthesize_to_file(text: str, voice: str, service: str, speed: float) -> Pat
         rate_percent = max(-50, min(100, int((speed - 1.0) * 100)))
         rate_str = f"+{rate_percent}%" if rate_percent > 0 else f"{rate_percent}%"
         safe_text = html.escape(text)
+        safe_voice = html.escape(voice)
         ssml = f"""<speak version='1.0' xml:lang='en-US'>
-            <voice xml:lang='en-US' name='{voice}'><prosody rate='{rate_str}'>{safe_text}</prosody></voice>
+            <voice xml:lang='en-US' name='{safe_voice}'><prosody rate='{rate_str}'>{safe_text}</prosody></voice>
         </speak>"""
 
         try:
@@ -515,6 +529,9 @@ def generate_speech():
         if service not in ['openai', 'speech']:
             return jsonify({'error': 'Invalid service selection'}), 400
 
+        if not is_allowed_voice(voice, service):
+            return jsonify({'error': 'Invalid voice selection'}), 400
+
         if not (0.25 <= speed <= 4.0):
             return jsonify({'error': 'Invalid speed value. Must be between 0.25 and 4.0'}), 400
 
@@ -566,6 +583,9 @@ def generate_combined():
 
         if not voice_da or not voice_en:
             return jsonify({'error': 'A voice must be selected for each language'}), 400
+
+        if not is_allowed_voice(voice_da, service) or not is_allowed_voice(voice_en, service):
+            return jsonify({'error': 'Invalid voice selection'}), 400
 
         if not (0.25 <= speed <= 4.0):
             return jsonify({'error': 'Invalid speed value. Must be between 0.25 and 4.0'}), 400
