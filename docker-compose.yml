@@ -2,7 +2,7 @@
 
 services:
   nginx:
-    image: nginx:alpine
+    image: nginx:1.31.9-alpine
     container_name: tts-nginx
     ports:
       - "80:80"
